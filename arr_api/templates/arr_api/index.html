@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Subscribarr – Übersicht</title>
+    <style>
+        :root {
+            --bg: #0b0b10;
+            --panel: #12121a;
+            --panel-b: #1f2030;
+            --accent: #3b82f6;
+            --muted: #9aa0b4;
+            --text: #e6e6e6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        h1 {
+            margin: 4px 0 12px;
+            font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .controls form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 220px;
+        }
+
+        .controls input[type=text] {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #2a2a34;
+            background: #111119;
+            color: var(--text);
+            font-size: 1rem;
+            min-width: 0;
+        }
+
+        .controls button[type=submit] {
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 0;
+            background: var(--accent);
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .seg {
+            display: inline-flex;
+            background: #0f0f17;
+            border: 1px solid #28293a;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .seg a {
+            padding: 8px 12px;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .seg a.active {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* Cards */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 14px;
+        }
+
+        @media (min-width: 900px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            }
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--panel-b);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            transition: transform .08s ease, border-color .08s;
+            cursor: pointer;
+        }
+
+        .card:active,
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #2a2b44;
+        }
+
+        .poster {
+            width: 110px;
+            height: 165px;
+            background: #222233;
+            border-radius: 8px;
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+
+        .poster img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .meta {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .episodes {
+            max-height: 210px;
+            overflow: auto;
+            padding-right: 6px;
+        }
+
+        .ep {
+            font-size: 0.92rem;
+            padding: 6px 0;
+            border-bottom: 1px dashed #25263a;
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .movie-card {
+            background: var(--panel);
+            border: 1px solid var(--panel-b);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .movie-card img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: block;
+            height: auto;
+        }
+
+        .section {
+            margin-top: 22px;
+        }
+
+        .section h2 {
+            font-size: 1.1rem;
+            margin: 12px 0;
+        }
+
+        /* Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 12, 20, .55);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 12px;
+        }
+
+        .modal {
+            width: min(960px, 100%);
+            max-height: 92vh;
+            overflow: auto;
+            background: linear-gradient(180deg, #10121b 0%, #0d0f16 100%);
+            border: 1px solid #2a2b44;
+            border-radius: 16px;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .6);
+        }
+
+        .modal-header {
+            position: sticky;
+            grid-template-columns: auto 1fr auto;
+            top: 0;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: 130px 1fr auto;
+            gap: 14px;
+            align-items: center;
+            padding: 16px;
+            background: rgba(13, 15, 22, .85);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid #20223a;
+        }
+
+        .m-poster {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            width: 130px;
+            height: 195px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #222233;
+        }
+
+        .m-poster img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .m-title {
+            font-size: 1.25rem;
+            font-weight: 750;
+            line-height: 1.2;
+            margin-bottom: 6px;
+        }
+
+        .m-sub {
+            color: var(--muted);
+            font-size: .92rem;
+        }
+
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #171a26;
+            border: 1px solid #2a2b44;
+            font-size: .82rem;
+            color: #cfd3ea;
+        }
+
+        .modal-close {
+            margin-left: auto;
+            align-self: start;
+            background: #1a1f33;
+            border: 1px solid #2a2b44;
+            color: #c9cbe3;
+            width: 36px;
+            height: 36px;
+            justify-self: end;
+            border-radius: 10px;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            font-size: 1.4rem;
+            line-height: 1;
+            transition: transform .08s ease, background .12s ease, border-color .12s ease;
+        }
+
+        .modal-close:hover {
+            background: #243055;
+            border-color: #3b4aa0;
+            transform: translateY(-1px);
+        }
+
+        .modal-body {
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        @media (min-width: 900px) {
+            .modal-body {
+                grid-template-columns: 1.2fr .8fr;
+            }
+        }
+
+        .section-block {
+            background: #101327;
+            border: 1px solid #20223a;
+            border-radius: 12px;
+            padding: 14px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 650;
+            margin: 0 0 8px;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: #20223a;
+            margin: 10px 0;
+            opacity: .9;
+        }
+
+        .ep-row {
+            border-bottom: 1px dashed #262947;
+            padding: 8px 0;
+            font-size: .94rem;
+        }
+
+        .ep-row:last-child {
+            border-bottom: 0;
+        }
+
+        /* control */
+        .controls input[type=number] {
+            width: 90px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #2a2a34;
+            background: #111119;
+            color: var(--text);
+            font-size: 1rem;
+            -moz-appearance: textfield;
+        }
+
+        .btn-subscribe {
+            padding: 8px 14px;
+            border-radius: 10px;
+            background: #1f6f3a;
+            border: 1px solid #2a2b34;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background .15s ease, transform .08s ease;
+        }
+
+        .btn-subscribe:hover {
+            background: #2b8f4d;
+        }
+
+        .btn-subscribe:active {
+            transform: translateY(1px);
+        }
+
+        .subscribed {
+            outline: 3px solid #1f6f3a;
+            /* grüne Markierung am Element */
+            outline-offset: 2px;
+        }
+
+
+        .controls input[type=number]::-webkit-outer-spin-button,
+        .controls input[type=number]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .controls input[type=number]:focus {
+            border-color: var(--accent);
+            outline: none;
+        }
+
+        .movie-card {
+            background: var(--panel);
+            border: 1px solid var(--panel-b);
+            border-radius: 12px;
+            padding: 12px;
+            cursor: pointer;
+            /* klickbar */
+            transition: transform .08s ease, border-color .08s;
+            /* wie .card */
+        }
+
+        .movie-card:hover,
+        .movie-card:focus-within {
+            transform: translateY(-2px);
+            border-color: #2a2b44;
+        }
+
+        .movie-card:active {
+            transform: translateY(0);
+            /* kleiner Tap-Feedback */
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="topbar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div></div>
+        <div style="display:flex;gap:8px;align-items:center">
+            <div class="debug" title="Debug"
+                style="padding:8px 10px;border:1px solid #2a2a34;border-radius:10px;background:#111119;color:#cfd3ea;font-size:.9rem;">
+                kind={{ kind }} · days={{ days }} · series={{ series_grouped|length }} · movies={{ movies|length }}
+            </div>
+            <a href="/settings/" class="btn"
+                style="padding:8px 12px;border-radius:10px;border:1px solid #2a2a34;background:#111119;color:#fff;text-decoration:none">
+                ⚙️ Einstellungen
+            </a>
+        </div>
+    </div>
+
+
+    <div class="wrap">
+        <h1>Subscribarr</h1>
+
+        <div class="controls">
+            <form method="get" class="controls-form">
+                <input type="hidden" name="kind" value="{{ kind|default:'all' }}">
+                <input type="text" name="q" placeholder="Suche Serien/Filme…" value="{{ query|default:'' }}">
+                <input type="number" name="days" min="1" max="365" value="{{ days|default:30 }}"
+                    title="Zeitraum in Tagen">
+                <button type="submit">Suchen</button>
+            </form>
+
+            <nav class="seg" aria-label="Typ filtern">
+                {% with qs=query|urlencode %}
+                <a href="?kind=all&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
+                    class="{% if kind == 'all' %}active{% endif %}">Alle</a>
+                <a href="?kind=series&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
+                    class="{% if kind == 'series' %}active{% endif %}">Serien</a>
+                <a href="?kind=movies&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
+                    class="{% if kind == 'movies' %}active{% endif %}">Filme</a>
+                {% endwith %}
+            </nav>
+        </div>
+
+        {% if show_series %}
+        <div class="section">
+            <h2>Laufende Serien</h2>
+            <div class="grid">
+                {% for s in series_grouped %}
+                <div class="card" data-series-id="{{ s.seriesId }}" data-title="{{ s.seriesTitle|escape }}"
+                    data-poster="{{ s.seriesPoster|default:'' }}"
+                    data-overview="{{ s.seriesOverview|default:''|escape }}">
+                    <div class="poster">
+                        {% if s.seriesPoster %}
+                        <img src="{{ s.seriesPoster }}" alt="{{ s.seriesTitle }}">
+                        {% else %}
+                        <img src="https://via.placeholder.com/110x165?text=No+Poster" alt="">
+                        {% endif %}
+                    </div>
+                    <div class="meta">
+                        <div class="title" title="{{ s.seriesTitle }}">{{ s.seriesTitle }}</div>
+                        <div class="episodes">
+                            {% for e in s.episodes %}
+                            <div class="ep">
+                                S{{ e.seasonNumber }}E{{ e.episodeNumber }} — {{ e.title|default:"(tba)" }}<br>
+                                <span class="muted" data-dt="{{ e.airDateUtc|default:'' }}"></span>
+                            </div>
+                            {% empty %}
+                            <div class="muted">Keine kommenden Episoden.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {# sichere Episoden-JSON für Modal #}
+                    {% with sid=s.seriesId|stringformat:"s" %}
+                    {% with eid="eps-"|add:sid %}
+                    {{ s.episodes|json_script:eid }}
+                    {% endwith %}
+                    {% endwith %}
+                </div>
+                {% empty %}
+                <p class="muted">Keine Serien gefunden.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if show_movies %}
+        <div class="section">
+            <h2>Anstehende Filme</h2>
+            <div class="grid">
+                {% for m in movies %}
+                <div class="movie-card" data-kind="movie" data-title="{{ m.title|escape }}"
+                    data-poster="{{ m.posterUrl|default:'' }}" data-overview="{{ m.overview|default:''|escape }}">
+                    {% if m.posterUrl %}
+                    <img src="{{ m.posterUrl }}" alt="{{ m.title }}">
+                    {% else %}
+                    <img src="https://via.placeholder.com/300x450?text=No+Poster" alt="">
+                    {% endif %}
+                    <div class="title">{{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}</div>
+                    <div class="muted">
+                        {% if m.inCinemas %}Kino: <span data-dt="{{ m.inCinemas }}"></span>{% endif %}
+                        {% if m.digitalRelease %}<br>Digital: <span data-dt="{{ m.digitalRelease }}"></span>{% endif %}
+                        {% if m.physicalRelease %}<br>Disc: <span data-dt="{{ m.physicalRelease }}"></span>{% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="muted">Keine Filme gefunden.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Modal -->
+    <div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="m-poster-wrap">
+                    <div class="m-poster"><img id="mPoster" alt=""></div>
+                    <button id="subscribeBtn" class="btn-subscribe" type="button">Subscribe</button>
+                </div>
+                <div>
+                    <div id="mTitle" class="m-title"></div>
+                    <div id="mSub" class="m-sub"></div>
+                    <div id="mBadges" class="badges"></div>
+                </div>
+                <button class="modal-close" title="Schließen" aria-label="Schließen">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="section-block">
+                    <div class="section-title">Beschreibung</div>
+                    <div id="mOverview" class="desc muted"></div>
+                </div>
+
+                <div class="section-block">
+                    <div class="section-title">Kommende Episoden</div>
+                    <div class="section-divider"></div>
+                    <div id="mEpisodes"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // ===== Helpers =====
+            const $ = (sel, root = document) => root.querySelector(sel);
+            const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+            // ===== Modal-Elemente =====
+            const backdrop = $("#modalBackdrop");
+            const closeBtn = backdrop.querySelector(".modal-close");
+            const mPoster = $("#mPoster");
+            const mTitle = $("#mTitle");
+            const mOverview = $("#mOverview");
+            const mEpisodes = $("#mEpisodes");
+            const mBadges = $("#mBadges");
+            const mSub = $("#mSub");
+            const epSection = mEpisodes.closest(".section-block");
+            const subscribeBtn = $("#subscribeBtn");
+
+            let lastClickedCard = null;
+
+            // ===== Modal open/close =====
+            function openModal() {
+                backdrop.style.display = "flex";
+                backdrop.setAttribute("aria-hidden", "false");
+                document.body.style.overflow = "hidden";
+            }
+            function closeModal() {
+                backdrop.style.display = "none";
+                backdrop.setAttribute("aria-hidden", "true");
+                document.body.style.overflow = "";
+            }
+            closeBtn.addEventListener("click", closeModal);
+            backdrop.addEventListener("click", e => { if (e.target === backdrop) closeModal(); });
+            window.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+            // ===== Subscribe-Only-UI (mit localStorage) =====
+            function subKey(card) {
+                if (!card) return null;
+                if (card.classList.contains("card") && card.dataset.seriesId) return "series:" + card.dataset.seriesId;
+                return "movie:" + (card.dataset.title || "");
+            }
+            function loadSub(card) {
+                const k = subKey(card);
+                return k ? localStorage.getItem("sub:" + k) === "1" : false;
+            }
+            function saveSub(card, on) {
+                const k = subKey(card);
+                if (!k) return;
+                if (on) localStorage.setItem("sub:" + k, "1");
+                else localStorage.removeItem("sub:" + k);
+            }
+            function applySubUI(card, on) {
+                if (card) card.classList.toggle("subscribed", !!on); // grüne Outline via .subscribed (CSS)
+                if (subscribeBtn) {
+                    subscribeBtn.textContent = on ? "Unsubscribe" : "Subscribe";
+                    subscribeBtn.setAttribute("aria-pressed", on ? "true" : "false");
+                }
+            }
+
+            // Beim Laden: gespeicherten Zustand auf alle Karten anwenden
+            $$(".card, .movie-card").forEach(c => applySubUI(c, loadSub(c)));
+
+            // ===== Serien-Karten öffnen =====
+            $$(".card").forEach(card => {
+                card.addEventListener("click", () => {
+                    lastClickedCard = card;
+
+                    const id = card.dataset.seriesId;
+                    const title = card.dataset.title || "";
+                    const poster = card.dataset.poster || "";
+                    const overview = card.dataset.overview || "";
+
+                    // Episoden aus eingebettetem JSON <script id="eps-<id>">
+                    let episodes = [];
+                    const script = document.getElementById("eps-" + id);
+                    if (script) { try { episodes = JSON.parse(script.textContent); } catch { } }
+
+                    // Modal befüllen
+                    mTitle.textContent = title;
+                    mPoster.src = poster || "https://via.placeholder.com/130x195?text=No+Poster";
+                    mPoster.alt = title;
+                    mOverview.textContent = overview || "Keine Beschreibung verfügbar.";
+
+                    mSub.textContent = episodes.length
+                        ? `${episodes.length} kommende Episode(n)`
+                        : "Keine kommenden Episoden";
+
+                    // Genres-Badges, falls data-genres vorhanden
+                    mBadges.innerHTML = "";
+                    if (card.dataset.genres) {
+                        card.dataset.genres.split(",").map(s => s.trim()).filter(Boolean).forEach(g => {
+                            const b = document.createElement("span");
+                            b.className = "badge";
+                            b.textContent = g;
+                            mBadges.appendChild(b);
+                        });
+                    }
+
+                    // Episodenbereich
+                    epSection.style.display = "";
+                    mEpisodes.innerHTML = "";
+                    if (!episodes.length) {
+                        const p = document.createElement("p");
+                        p.className = "muted";
+                        p.textContent = "—";
+                        mEpisodes.appendChild(p);
+                    } else {
+                        episodes.forEach(e => {
+                            const row = document.createElement("div");
+                            row.className = "ep-row";
+                            const dt = e.airDateUtc ? new Date(e.airDateUtc) : null;
+                            const when = dt && !isNaN(dt) ? dt.toLocaleString() : "-";
+                            row.innerHTML = `<strong>S${e.seasonNumber}E${e.episodeNumber}</strong> — ${e.title ?? "(tba)"}<br><span class="muted">${when}</span>`;
+                            mEpisodes.appendChild(row);
+                        });
+                    }
+
+                    // Subscribe-UI für diese Karte setzen
+                    applySubUI(lastClickedCard, loadSub(lastClickedCard));
+
+                    openModal();
+                });
+            });
+
+            // ===== Film-Karten öffnen =====
+            $$(".movie-card").forEach(card => {
+                card.addEventListener("click", () => {
+                    lastClickedCard = card;
+
+                    const title = card.dataset.title || "";
+                    const poster = card.dataset.poster || "";
+                    const overview = card.dataset.overview || "";
+
+                    mTitle.textContent = title;
+                    mPoster.src = poster || "https://via.placeholder.com/130x195?text=No+Poster";
+                    mPoster.alt = title;
+                    mOverview.textContent = overview || "Keine Beschreibung verfügbar.";
+
+                    mSub.textContent = "";
+                    mBadges.innerHTML = "";
+
+                    // Episodenbereich ausblenden
+                    epSection.style.display = "none";
+                    mEpisodes.innerHTML = "";
+
+                    // Subscribe-UI für diese Karte setzen
+                    applySubUI(lastClickedCard, loadSub(lastClickedCard));
+
+                    openModal();
+                });
+            });
+
+            // ===== Subscribe-Button im Modal toggelt nur UI + localStorage =====
+            if (subscribeBtn) {
+                subscribeBtn.addEventListener("click", () => {
+                    if (!lastClickedCard) return;
+                    const now = !loadSub(lastClickedCard);
+                    saveSub(lastClickedCard, now);
+                    applySubUI(lastClickedCard, now);
+                });
+            }
+
+            // ===== Datumsangaben in der Übersicht formatieren =====
+            document.querySelectorAll("[data-dt]").forEach(el => {
+                const v = el.getAttribute("data-dt");
+                if (!v) return;
+                const d = new Date(v);
+                el.textContent = isNaN(d) ? v : d.toLocaleString();
+            });
+        })();
+    </script>
+
+</body>
+
+</html>
