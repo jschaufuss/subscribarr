@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Wait for potential dependencies (none for sqlite)
-
 # Apply migrations
 python manage.py migrate --noinput
 
@@ -20,19 +18,11 @@ username = os.environ['ADMIN_USERNAME']
 password = os.environ['ADMIN_PASSWORD']
 email = os.environ.get('ADMIN_EMAIL') or f"{username}@local"
 user, created = User.objects.get_or_create(username=username, defaults={'email': email})
-if created:
-    user.set_password(password)
-    user.is_superuser = True
-    user.is_staff = True
-    user.is_admin = True
-    user.save()
-else:
-    # update password if user exists
-    user.set_password(password)
-    user.is_superuser = True
-    user.is_staff = True
-    user.is_admin = True
-    user.save()
+user.set_password(password)
+user.is_superuser = True
+user.is_staff = True
+user.is_admin = True
+user.save()
 print("Admin ready")
 PY
 fi
@@ -75,14 +65,14 @@ s.save()
 print("AppSettings seeded from environment (if provided)")
 PY
 
-# Start cron for periodic job if schedule is set
+# Setup cron if schedule provided
 if [[ -n "${CRON_SCHEDULE:-}" ]]; then
-  echo "Setting cron schedule: ${CRON_SCHEDULE}"
-  # write cronjob to user crontab
-  CRONLINE="${CRON_SCHEDULE} cd /app && /usr/local/bin/python manage.py check_new_media >> /app/cron.log 2>&1"
-  (crontab -l 2>/dev/null; echo "$CRONLINE") | crontab -
-  crond
+  echo "Configuring cron: ${CRON_SCHEDULE}"
+  echo "${CRON_SCHEDULE} cd /app && /usr/local/bin/python manage.py check_new_media >> /app/cron.log 2>&1" > /etc/cron.d/subscribarr
+  chmod 0644 /etc/cron.d/subscribarr
+  crontab /etc/cron.d/subscribarr
+  /usr/sbin/cron
 fi
 
-# Start server
+# Run server
 exec python manage.py runserver 0.0.0.0:8000

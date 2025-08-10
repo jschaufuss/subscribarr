@@ -21,7 +21,7 @@ COPY . /app
 
 # Optional non-root user (not used as default to allow cron)
 RUN useradd -ms /bin/bash app && chown -R app:app /app
-# USER app  # keep running as root to manage cron
+# USER app
 
 # Runtime env defaults
 ENV DJANGO_DEBUG=true \
