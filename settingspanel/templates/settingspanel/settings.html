@@ -6,201 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Einstellungen – Subscribarr</title>
-    <style>
-        :root {
-            --bg: #0b0b10;
-            --panel: #12121a;
-            --panel-b: #1f2030;
-            --accent: #3b82f6;
-            --muted: #9aa0b4;
-            --text: #e6e6e6;
-        }
-
-        * {
-            box-sizing: border-box
-        }
-
-        body {
-            background: var(--bg);
-            color: var(--text);
-            font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
-            margin: 0
-        }
-
-        .wrap {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 16px
-        }
-
-        a {
-            color: #cfd3ea;
-            text-decoration: none
-        }
-
-        .topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px
-        }
-
-        .btn {
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid #2a2a34;
-            background: #111119;
-            color: #fff;
-            cursor: pointer
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            border-color: transparent
-        }
-
-        .grid {
-            display: grid;
-            gap: 16px
-        }
-
-        @media(min-width:900px) {
-            .grid {
-                grid-template-columns: 1fr 1fr
-            }
-        }
-
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--panel-b);
-            border-radius: 12px;
-            padding: 14px
-        }
-
-        .card h2 {
-            margin: 0 0 10px;
-            font-size: 1.05rem
-        }
-
-        .row {
-            display: grid;
-            grid-template-columns: 160px minmax(0, 1fr);
-            /* <= statt 160px 1fr */
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .row label {
-            color: #c9cbe3
-        }
-
-        .row input,
-        .row select {
-            width: 100%;
-            padding: 10px 12px;
-            border-radius: 10px;
-            border: 1px solid #2a2a34;
-            background: #111119;
-            color: var(--text)
-        }
-
-        .help {
-            color: var(--muted);
-            font-size: .9rem
-        }
-
-        .msgs {
-            margin-bottom: 10px
-        }
-
-        .msg {
-            background: #0f1425;
-            border: 1px solid #283058;
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 8px
-        }
-
-        .input-wide {
-            width: 100% !important;
-            max-width: 100%;
-            min-width: 0;
-            display: block;
-        }
-
-        .row input,
-        .row select,
-        .row textarea {
-            width: 100%;
-            max-width: 100%;
-            min-width: 0;
-            display: block;
-        }
-
-        /* falls du passwort/URL Felder extra stylen willst, gleicher Fix */
-        .inline>input,
-        .inline>.django-url,
-        /* falls Widget eine Klasse rendert */
-        .inline>.django-password {
-            min-width: 0;
-            width: 100%;
-        }
-
-        .inline-actions {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            min-width: 220px;
-            justify-content: flex-end;
-        }
-
-        .btn {
-            padding: 10px 14px;
-            border-radius: 10px;
-            border: 1px solid #2a2a34;
-            background: #111119;
-            color: #fff;
-            cursor: pointer;
-        }
-
-        .btn:disabled {
-            opacity: .6;
-            cursor: default;
-        }
-
-        .badge {
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-size: .85rem;
-            border: 1px solid #2a2a34;
-            background: #111119;
-            color: #cfd3ea;
-            white-space: nowrap;
-            /* eine Zeile */
-            max-width: 140px;
-            /* begrenzt die Breite */
-            overflow: hidden;
-            text-overflow: ellipsis;
-            /* falls doch Text drin ist */
-        }
-
-        .badge.ok {
-            border-color: #1f6f3a;
-            background: #10331f;
-            color: #a7e3bd;
-        }
-
-        .badge.err {
-            border-color: #6f1f2a;
-            background: #341016;
-            color: #f1a3b0;
-        }
-
-        .badge.muted {
-            opacity: .8;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/settings.css' %}">
 </head>
 
 <body>
@@ -218,6 +24,20 @@
         <form method="post">
             {% csrf_token %}
             <div class="grid">
+                <div class="card">
+                    <h2>Jellyfin</h2>
+                    <div class="row">
+                        <label>Jellyfin Server URL</label>
+                        {{ jellyfin_form.jellyfin_server_url }}
+                        <div class="help">z.B. http://localhost:8096</div>
+                    </div>
+                    <div class="row">
+                        <label>Jellyfin API Key</label>
+                        {{ jellyfin_form.jellyfin_api_key }}
+                        <div class="help">Admin API Key aus den Jellyfin Einstellungen</div>
+                    </div>
+                </div>
+
                 <div class="card">
                     <h2>Sonarr & Radarr</h2>
 

@@ -4,11 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-django = "*"
 django-environ = "*"
 djangorestframework = "*"
 requests = "*"
 python-dateutil = "*"
+django = "*"
+jellyfin-apiclient-python = "*"
 
 [dev-packages]
 

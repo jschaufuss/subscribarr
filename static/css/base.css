@@ -1,0 +1,160 @@
+:root {
+    --bg: #0b0b10;
+    --panel: #12121a;
+    --panel-b: #1f2030;
+    --accent: #3b82f6;
+    --muted: #9aa0b4;
+    --text: #e6e6e6;
+}
+
+body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.auth-container {
+    max-width: 400px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.auth-form {
+    background: var(--panel);
+    border: 1px solid var(--panel-b);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.auth-form label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+}
+
+.auth-form input:not([type="checkbox"]) {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #2a2a34;
+    background: #111119;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.auth-form input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.btn-primary {
+    display: inline-block;
+    padding: 10px 20px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-decoration: none;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+.auth-links {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.auth-links a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+.errorlist {
+    color: #ef4444;
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+}
+
+.helptext {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.main-nav {
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-b);
+    padding: 12px 16px;
+}
+
+.nav-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--text);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+.nav-links {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.nav-links a,
+.nav-links button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+}
+
+.nav-links a:hover,
+.nav-links button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-info {
+    color: var(--muted);
+    margin-right: 8px;
+}
+
+.nav-register {
+    background: var(--accent) !important;
+}
+
+.nav-register:hover {
+    filter: brightness(1.1);
+    background: var(--accent);
+}
+
+.nav-logout {
+    color: #ef4444 !important;
+}
+
+.nav-admin {
+    color: var(--accent) !important;
+}

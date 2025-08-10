@@ -1,0 +1,155 @@
+.profile-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px
+}
+
+.profile-section {
+    background: var(--panel);
+    border: 1px solid var(--panel-b);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0
+}
+
+.subscription-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+    margin-top: 12px
+}
+
+.subscription-item {
+    display: flex;
+    gap: 12px;
+    background: rgba(0, 0, 0, .2);
+    padding: 12px;
+    border-radius: 8px;
+    transition: transform .2s ease;
+    cursor: pointer
+}
+
+.subscription-item:hover {
+    transform: translateY(-2px);
+    background: rgba(0, 0, 0, .3)
+}
+
+.subscription-poster {
+    width: 80px;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .2)
+}
+
+.subscription-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center
+}
+
+.subscription-title {
+    font-weight: 600;
+    margin-bottom: 4px
+}
+
+.subscription-date {
+    font-size: .9rem;
+    color: var(--muted);
+    margin-bottom: 4px
+}
+
+.subscription-overview {
+    font-size: .9rem;
+    color: var(--muted);
+    line-height: 1.4;
+    opacity: .9
+}
+
+.messages {
+    margin-bottom: 20px
+}
+
+.message {
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px
+}
+
+.message.success {
+    background: #1f6f3a;
+    color: #fff
+}
+
+.message.error {
+    background: #ef4444;
+    color: #fff
+}
+
+.btn-secondary {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #1f2030;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 8px;
+    border: 1px solid #2a2b44
+}
+
+.btn-secondary:hover {
+    background: #2a2b44
+}
+
+.mt-4 {
+    margin-top: 16px
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: .875rem;
+    font-weight: 500
+}
+
+.badge-admin {
+    background-color: #1f6f3a;
+    color: #fff
+}
+
+.jellyfin-info {
+    margin-top: 24px;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--panel-b);
+    border-radius: 8px
+}
+
+.jellyfin-info h4 {
+    margin: 0 0 12px 0;
+    color: var(--accent)
+}
+
+.compact-form .form-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px
+}
+
+.text-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2a2a34;
+    background: #111119;
+    color: var(--text)
+}
+
+.text-input:focus {
+    border-color: var(--accent);
+    outline: none
+}

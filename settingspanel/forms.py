@@ -2,6 +2,58 @@ from django import forms
 
 WIDE = {"class": "input-wide"}
 
+class FirstRunSetupForm(forms.Form):
+    # Jellyfin (Required)
+    jellyfin_server_url = forms.URLField(
+        label="Jellyfin Server URL",
+        required=True,
+        help_text="Die URL deines Jellyfin-Servers"
+    )
+    jellyfin_api_key = forms.CharField(
+        label="Jellyfin API Key",
+        required=True,
+        widget=forms.PasswordInput(render_value=True),
+        help_text="Der API-Key aus den Jellyfin-Einstellungen"
+    )
+    
+    # Sonarr (Optional)
+    sonarr_url = forms.URLField(
+        label="Sonarr URL",
+        required=False,
+        help_text="Die URL deines Sonarr-Servers"
+    )
+    sonarr_api_key = forms.CharField(
+        label="Sonarr API Key",
+        required=False,
+        widget=forms.PasswordInput(render_value=True)
+    )
+    
+    # Radarr (Optional)
+    radarr_url = forms.URLField(
+        label="Radarr URL",
+        required=False,
+        help_text="Die URL deines Radarr-Servers"
+    )
+    radarr_api_key = forms.CharField(
+        label="Radarr API Key",
+        required=False,
+        widget=forms.PasswordInput(render_value=True)
+    )
+
+class JellyfinSettingsForm(forms.Form):
+    jellyfin_server_url = forms.URLField(
+        label="Jellyfin Server URL",
+        required=False,
+        widget=forms.URLInput(attrs=WIDE),
+        help_text="z.B. http://localhost:8096"
+    )
+    jellyfin_api_key = forms.CharField(
+        label="Jellyfin API Key",
+        required=False,
+        widget=forms.PasswordInput(render_value=True, attrs=WIDE),
+        help_text="Admin API Key aus den Jellyfin Einstellungen"
+    )
+
 class ArrSettingsForm(forms.Form):
     sonarr_url     = forms.URLField(label="Sonarr URL", required=False,
                                     widget=forms.URLInput(attrs=WIDE))

@@ -1,13 +1,18 @@
 from collections import defaultdict
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 from django.contrib import messages
+from django.views.decorators.http import require_POST
+from django.utils.decorators import method_decorator
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
 from settingspanel.models import AppSettings
 from .services import sonarr_calendar, radarr_calendar, ArrServiceError
+from .models import SeriesSubscription, MovieSubscription
 
 
 def _get_int(request, key, default):
@@ -27,26 +32,26 @@ def _arr_conf_from_db():
     }
 
 
-class SonarrAiringView(APIView):
-    def get(self, request):
-        days = _get_int(request, "days", 30)
-        conf = _arr_conf_from_db()
-        try:
-            data = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
-            return Response({"count": len(data), "results": data})
-        except ArrServiceError as e:
-            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+#class SonarrAiringView(APIView):
+#    def get(self, request):
+#        days = _get_int(request, "days", 30)
+#        conf = _arr_conf_from_db()
+#        try:
+#            data = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
+#            return Response({"count": len(data), "results": data})
+#        except ArrServiceError as e:
+#            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
-class RadarrUpcomingMoviesView(APIView):
-    def get(self, request):
-        days = _get_int(request, "days", 60)
-        conf = _arr_conf_from_db()
-        try:
-            data = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
-            return Response({"count": len(data), "results": data})
-        except ArrServiceError as e:
-            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+#class RadarrUpcomingMoviesView(APIView):
+#    def get(self, request):
+#        days = _get_int(request, "days", 60)
+#        conf = _arr_conf_from_db()
+#        try:
+#            data = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
+#            return Response({"count": len(data), "results": data})
+#        except ArrServiceError as e:
+#            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
 class ArrIndexView(View):
@@ -75,10 +80,14 @@ class ArrIndexView(View):
             eps = [e for e in eps if q in (e.get("seriesTitle") or "").lower()]
             movies = [m for m in movies if q in (m.get("title") or "").lower()]
 
+        # Abonnierte Serien und Filme laden
+        subscribed_series_ids = set(SeriesSubscription.objects.values_list('series_id', flat=True))
+        subscribed_movie_ids = set(MovieSubscription.objects.values_list('movie_id', flat=True))
+
         # Gruppierung nach Serie
         groups = defaultdict(lambda: {
             "seriesId": None, "seriesTitle": None, "seriesPoster": None,
-            "seriesOverview": "", "seriesGenres": [], "episodes": [],
+            "seriesOverview": "", "seriesGenres": [], "episodes": [], "is_subscribed": False,
         })
         for e in eps:
             sid = e["seriesId"]
@@ -101,7 +110,12 @@ class ArrIndexView(View):
         series_grouped = []
         for g in groups.values():
             g["episodes"].sort(key=lambda x: (x["airDateUtc"] or ""))
+            g["is_subscribed"] = g["seriesId"] in subscribed_series_ids
             series_grouped.append(g)
+
+        # Markiere abonnierte Filme
+        for movie in movies:
+            movie["is_subscribed"] = movie.get("movieId") in subscribed_movie_ids
 
         return render(request, "arr_api/index.html", {
             "query": q,
@@ -112,3 +126,252 @@ class ArrIndexView(View):
             "series_grouped": series_grouped,
             "movies": movies,
         })
+
+
+class SubscribeSeriesView(View):
+    @method_decorator(require_POST)
+    def post(self, request, series_id):
+        series_data = {
+            'series_id': series_id,
+            'series_title': request.POST.get('series_title'),
+            'series_poster': request.POST.get('series_poster'),
+            'series_overview': request.POST.get('series_overview'),
+            'series_genres': request.POST.getlist('series_genres[]', [])
+        }
+        
+        subscription, created = SeriesSubscription.objects.get_or_create(
+            series_id=series_id,
+            defaults=series_data
+        )
+        
+        if created:
+            messages.success(request, f'Serie "{series_data["series_title"]}" wurde abonniert!')
+        else:
+            messages.info(request, f'Serie "{series_data["series_title"]}" war bereits abonniert.')
+            
+        return redirect('arr_api:index')
+
+class UnsubscribeSeriesView(View):
+    @method_decorator(require_POST)
+    def post(self, request, series_id):
+        subscription = get_object_or_404(SeriesSubscription, series_id=series_id)
+        series_title = subscription.series_title
+        subscription.delete()
+        messages.success(request, f'Abonnement für "{series_title}" wurde beendet.')
+        return redirect('arr_api:index')
+
+class SubscribeMovieView(View):
+    @method_decorator(require_POST)
+    def post(self, request, movie_id):
+        movie_data = {
+            'movie_id': movie_id,
+            'title': request.POST.get('title'),
+            'poster': request.POST.get('poster'),
+            'overview': request.POST.get('overview'),
+            'genres': request.POST.getlist('genres[]', []),
+            'release_date': request.POST.get('release_date')
+        }
+        
+        subscription, created = MovieSubscription.objects.get_or_create(
+            movie_id=movie_id,
+            defaults=movie_data
+        )
+        
+        if created:
+            messages.success(request, f'Film "{movie_data["title"]}" wurde abonniert!')
+        else:
+            messages.info(request, f'Film "{movie_data["title"]}" war bereits abonniert.')
+            
+        return redirect('arr_api:index')
+
+class UnsubscribeMovieView(View):
+    @method_decorator(require_POST)
+    def post(self, request, movie_id):
+        subscription = get_object_or_404(MovieSubscription, movie_id=movie_id)
+        movie_title = subscription.title
+        subscription.delete()
+        messages.success(request, f'Abonnement für "{movie_title}" wurde beendet.')
+        return redirect('arr_api:index')
+
+
+@require_POST
+@login_required
+def subscribe_series(request, series_id):
+    """Serie abonnieren"""
+    try:
+        # Existiert bereits?
+        if SeriesSubscription.objects.filter(user=request.user, series_id=series_id).exists():
+            return JsonResponse({'success': True, 'already_subscribed': True})
+
+        # Hole Serien-Details vom Sonarr
+        conf = _arr_conf_from_db()
+        # TODO: Sonarr API Call für Series Details
+
+        # Erstelle Subscription
+        sub = SeriesSubscription.objects.create(
+            user=request.user,
+            series_id=series_id,
+            series_title=request.POST.get('title', ''),
+            series_poster=request.POST.get('poster', ''),
+            series_overview=request.POST.get('overview', ''),
+            series_genres=request.POST.getlist('genres[]', [])
+        )
+        return JsonResponse({'success': True})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@require_POST
+@login_required
+def unsubscribe_series(request, series_id):
+    """Serie deabonnieren"""
+    try:
+        SeriesSubscription.objects.filter(user=request.user, series_id=series_id).delete()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+def is_subscribed_series(request, series_id):
+    """Prüfe ob Serie abonniert ist"""
+    is_subbed = SeriesSubscription.objects.filter(user=request.user, series_id=series_id).exists()
+    return JsonResponse({'subscribed': is_subbed})
+
+@require_POST
+@login_required
+def subscribe_movie(request, movie_id):
+    """Film abonnieren"""
+    try:
+        # Existiert bereits?
+        if MovieSubscription.objects.filter(user=request.user, movie_id=movie_id).exists():
+            return JsonResponse({'success': True, 'already_subscribed': True})
+
+        # Hole Film-Details vom Radarr
+        conf = _arr_conf_from_db()
+        # TODO: Radarr API Call für Movie Details
+
+        # Erstelle Subscription
+        sub = MovieSubscription.objects.create(
+            user=request.user,
+            movie_id=movie_id,
+            title=request.POST.get('title', ''),
+            poster=request.POST.get('poster', ''),
+            overview=request.POST.get('overview', ''),
+            genres=request.POST.getlist('genres[]', []),
+            release_date=request.POST.get('release_date')
+        )
+        return JsonResponse({'success': True})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@require_POST
+@login_required
+def unsubscribe_movie(request, movie_id):
+    """Film deabonnieren"""
+    try:
+        MovieSubscription.objects.filter(user=request.user, movie_id=movie_id).delete()
+        return JsonResponse({'success': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
+
+@login_required
+def is_subscribed_movie(request, movie_id):
+    """Prüfe ob Film abonniert ist"""
+    is_subbed = MovieSubscription.objects.filter(user=request.user, movie_id=movie_id).exists()
+    return JsonResponse({'subscribed': is_subbed})
+
+@login_required
+def get_subscriptions(request):
+    """Hole alle Abonnements des Users"""
+    series = SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True)
+    movies = MovieSubscription.objects.filter(user=request.user).values_list('movie_id', flat=True)
+    return JsonResponse({
+        'series': list(series),
+        'movies': list(movies)
+    })
+
+
+@method_decorator(login_required, name='dispatch')
+class SeriesSubscribeView(APIView):
+    def post(self, request, series_id):
+        from .services import sonarr_get_series
+        cfg = AppSettings.current()
+        details = None
+        try:
+            details = sonarr_get_series(series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
+        except Exception:
+            details = None
+        defaults = {
+            'series_title': request.data.get('title', '') if request.data else '',
+            'series_poster': request.data.get('poster', '') if request.data else '',
+            'series_overview': request.data.get('overview', '') if request.data else '',
+            'series_genres': request.data.get('genres', []) if request.data else [],
+        }
+        if details:
+            defaults.update({
+                'series_title': details.get('series_title') or defaults['series_title'],
+                'series_poster': details.get('series_poster') or defaults['series_poster'],
+                'series_overview': details.get('series_overview') or defaults['series_overview'],
+                'series_genres': details.get('series_genres') or defaults['series_genres'],
+            })
+        sub, created = SeriesSubscription.objects.get_or_create(
+            user=request.user,
+            series_id=series_id,
+            defaults=defaults
+        )
+        return Response({'status': 'subscribed'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+@method_decorator(login_required, name='dispatch')
+class SeriesUnsubscribeView(APIView):
+    def post(self, request, series_id):
+        SeriesSubscription.objects.filter(user=request.user, series_id=series_id).delete()
+        return Response({'status': 'unsubscribed'}, status=status.HTTP_200_OK)
+
+@method_decorator(login_required, name='dispatch')
+class MovieSubscribeView(APIView):
+    def post(self, request, title):
+        from .services import radarr_lookup_movie_by_title
+        cfg = AppSettings.current()
+        details = None
+        try:
+            details = radarr_lookup_movie_by_title(title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
+        except Exception:
+            details = None
+        defaults = {
+            'movie_id': (request.data.get('movie_id', 0) if request.data else 0) or 0,
+            'poster': request.data.get('poster', '') if request.data else '',
+            'overview': request.data.get('overview', '') if request.data else '',
+            'genres': request.data.get('genres', []) if request.data else [],
+        }
+        if details:
+            defaults.update({
+                'movie_id': details.get('movie_id') or defaults['movie_id'],
+                'poster': details.get('poster') or defaults['poster'],
+                'overview': details.get('overview') or defaults['overview'],
+                'genres': details.get('genres') or defaults['genres'],
+            })
+        sub, created = MovieSubscription.objects.get_or_create(
+            user=request.user,
+            title=title,
+            defaults=defaults
+        )
+        return Response({'status': 'subscribed'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+@method_decorator(login_required, name='dispatch')
+class MovieUnsubscribeView(APIView):
+    def post(self, request, title):
+        MovieSubscription.objects.filter(user=request.user, title=title).delete()
+        return Response({'status': 'unsubscribed'}, status=status.HTTP_200_OK)
+
+@method_decorator(login_required, name='dispatch')
+class ListSeriesSubscriptionsView(APIView):
+    def get(self, request):
+        subs = SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True)
+        return Response(list(subs))
+
+@method_decorator(login_required, name='dispatch')
+class ListMovieSubscriptionsView(APIView):
+    def get(self, request):
+        subs = MovieSubscription.objects.filter(user=request.user).values_list('title', flat=True)
+        return Response(list(subs))

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_style %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h2>Hallo, {{ user.username }}</h2>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="profile-section">
+        <h3>E-Mail-Adresse</h3>
+        <form method="post" class="profile-form compact-form">
+            {% csrf_token %}
+            <div class="form-row">
+                <label for="id_email">E-Mail</label>
+                {{ form.email }}
+            </div>
+            <button type="submit" class="btn-primary">Speichern</button>
+        </form>
+
+        {% if user.jellyfin_server %}
+        <div class="jellyfin-info">
+            <h4>Jellyfin-Verbindung</h4>
+            <p>
+                Server: {{ user.jellyfin_server }}<br>
+                Status: {% if user.jellyfin_token %}Verbunden{% else %}Nicht verbunden{% endif %}<br>
+                {% if user.is_jellyfin_admin %}
+                <span class="badge badge-admin">Jellyfin Administrator</span>
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="profile-section">
+        <h3>Meine Abonnements</h3>
+
+        <h4>Serien</h4>
+        {% if series_subs %}
+        <div class="subscription-list">
+            {% for sub in series_subs %}
+            <div class="subscription-item">
+                {% if sub.series_poster %}
+                <img src="{{ sub.series_poster }}" alt="{{ sub.series_title }}" class="subscription-poster">
+                {% else %}
+                <img src="https://via.placeholder.com/80x120?text=Kein+Poster" alt="" class="subscription-poster">
+                {% endif %}
+                <div class="subscription-info">
+                    <div class="subscription-title">{{ sub.series_title }}</div>
+                    <div class="subscription-date">Abonniert am {{ sub.created_at|date:"d.m.Y" }}</div>
+                    {% if sub.series_overview %}
+                    <div class="subscription-overview">{{ sub.series_overview|truncatechars:100 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Keine Serien abonniert.</p>
+        {% endif %}
+
+        <h4>Filme</h4>
+        {% if movie_subs %}
+        <div class="subscription-list">
+            {% for sub in movie_subs %}
+            <div class="subscription-item">
+                {% if sub.poster %}
+                <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
+                {% else %}
+                <img src="https://via.placeholder.com/80x120?text=Kein+Poster" alt="" class="subscription-poster">
+                {% endif %}
+                <div class="subscription-info">
+                    <div class="subscription-title">{{ sub.title }}</div>
+                    <div class="subscription-date">Abonniert am {{ sub.created_at|date:"d.m.Y" }}</div>
+                    {% if sub.overview %}
+                    <div class="subscription-overview">{{ sub.overview|truncatechars:100 }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="muted">Keine Filme abonniert.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

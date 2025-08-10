@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,18 +21,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p^2cgzteh=p3ppya71l7+r3nuc=_w@2#fer4n7ckywt1$x%u&j'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-p^2cgzteh=p3ppya71l7+r3nuc=_w@2#fer4n7ckywt1$x%u&j')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h for h in os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') if h] or []
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'arr_api',
     'settingspanel',
+    'accounts',
 ]
 
 MIDDLEWARE = [
@@ -50,6 +51,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'settingspanel.middleware.SetupMiddleware',
 ]
 
 ROOT_URLCONF = 'subscribarr.urls'
@@ -57,7 +59,7 @@ ROOT_URLCONF = 'subscribarr.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -75,10 +77,11 @@ WSGI_APPLICATION = 'subscribarr.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+_db_path = os.getenv('DB_PATH')
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': _db_path if _db_path else BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -105,9 +108,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'de-de'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Berlin'
 
 USE_I18N = True
 
@@ -118,8 +121,39 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+# STATIC_ROOT could be set for collectstatic in production
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.User'
+
+# Login-URLs
+LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+# Default Jellyfin Settings - will be overridden by database settings
+JELLYFIN_CLIENT = 'Subscribarr'
+JELLYFIN_VERSION = '10.10.7'
+JELLYFIN_DEVICE = 'Subscribarr'
+JELLYFIN_DEVICE_ID = 'subscribarr-instance'
+
+# Email Settings - override these with settings from the database
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = None  # Will be set from AppSettings
+EMAIL_PORT = None  # Will be set from AppSettings
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = None  # Will be set from AppSettings
+EMAIL_HOST_PASSWORD = None  # Will be set from AppSettings
+DEFAULT_FROM_EMAIL = None  # Will be set from AppSettings
+
+# Notifications / Debug
+# If True, duplicate suppression is disabled and emails can be resent on every run.
+NOTIFICATIONS_ALLOW_DUPLICATES = os.getenv('NOTIFICATIONS_ALLOW_DUPLICATES', 'True').lower() == 'true'
