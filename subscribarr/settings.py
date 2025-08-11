@@ -116,6 +116,21 @@ if not CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS = ['https://subscribarr.local.js-devop.de']
 
 
+USE_X_FORWARDED_HOST = os.getenv('USE_X_FORWARDED_HOST', 'False').lower() == 'true'
+if os.getenv('DJANGO_SECURE_PROXY_SSL_HEADER', '').lower() in ('1', 'true', 'yes'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Secure cookies when served over HTTPS (optional)
+CSRF_COOKIE_SECURE = os.getenv('DJANGO_CSRF_COOKIE_SECURE', 'False').lower() == 'true'
+SESSION_COOKIE_SECURE = os.getenv('DJANGO_SESSION_COOKIE_SECURE', 'False').lower() == 'true'
+
+# Optional cookie domain override (for subdomain setups)
+_cookie_domain = os.getenv('DJANGO_COOKIE_DOMAIN', '').strip()
+if _cookie_domain:
+    CSRF_COOKIE_DOMAIN = _cookie_domain
+    SESSION_COOKIE_DOMAIN = _cookie_domain
+
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
