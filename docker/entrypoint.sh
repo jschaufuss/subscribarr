@@ -67,11 +67,20 @@ print("AppSettings seeded from environment (if provided)")
 PY
 
 # Setup cron if schedule provided
-if [[ -n "${CRON_SCHEDULE:-}" ]]; then
-  echo "Configuring cron: ${CRON_SCHEDULE}"
-  echo "${CRON_SCHEDULE} cd /app && /usr/local/bin/python manage.py check_new_media >> /app/cron.log 2>&1" > /etc/cron.d/subscribarr
+if [ -n "${CRON_SCHEDULE:-}" ]; then
+  cat >/etc/cron.d/subscribarr <<EOF
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# gleiche DB wie die App:
+DB_PATH=${DB_PATH:-/app/data/db.sqlite3}
+PYTHON=/usr/local/bin/python
+
+# <m h dom mon dow> <user> <cmd>
+${CRON_SCHEDULE} root cd /app && \$PYTHON manage.py migrate --noinput && \$PYTHON manage.py check_new_media >> /app/cron.log 2>&1
+EOF
+
   chmod 0644 /etc/cron.d/subscribarr
-  crontab /etc/cron.d/subscribarr
   /usr/sbin/cron
 fi
 
