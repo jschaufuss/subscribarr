@@ -7,28 +7,28 @@
 
 {% block content %}
 <div class="setup-container">
-    <h1>Willkommen bei Subscribarr</h1>
-    <p class="setup-intro">Lass uns deine Installation einrichten. Du brauchst mindestens einen Jellyfin-Server.</p>
+    <h1>Welcome to Subscribarr</h1>
+    <p class="setup-intro">Let's set up your installation. You need at least one Jellyfin server.</p>
 
     <form method="post" class="setup-form">
         {% csrf_token %}
 
         <div class="setup-section">
-            <h2>Jellyfin Server (Erforderlich)</h2>
+            <h2>Jellyfin server (required)</h2>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.jellyfin_server_url }}
-                <div class="help">z.B. http://192.168.1.100:8096 oder http://jellyfin.local:8096</div>
+                <div class="help">e.g., http://192.168.1.100:8096 or http://jellyfin.local:8096</div>
             </div>
             <div class="form-group">
                 <label>API Key</label>
                 {{ form.jellyfin_api_key }}
-                <div class="help">Admin API Key aus den Jellyfin-Einstellungen</div>
+                <div class="help">Admin API key from Jellyfin settings</div>
             </div>
         </div>
 
         <div class="setup-section">
-            <h2>Sonarr (Optional)</h2>
+            <h2>Sonarr (optional)</h2>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.sonarr_url }}
@@ -40,7 +40,7 @@
         </div>
 
         <div class="setup-section">
-            <h2>Radarr (Optional)</h2>
+            <h2>Radarr (optional)</h2>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.radarr_url }}
@@ -51,7 +51,7 @@
             </div>
         </div>
 
-        <button type="submit" class="setup-submit">Installation abschließen</button>
+    <button type="submit" class="setup-submit">Finish setup</button>
     </form>
 </div>
 {% endblock %}

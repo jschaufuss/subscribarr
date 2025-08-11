@@ -39,6 +39,14 @@ h1 {
     margin-bottom: 16px
 }
 
+@media (max-width: 640px) {
+    .controls { flex-direction: column; align-items: stretch; }
+    .controls form { width: 100%; }
+    .controls .seg { width: 100%; justify-content: space-between; }
+    .controls-actions { width: 100%; }
+    .controls-actions .btn { width: 100%; justify-content: center; }
+}
+
 .controls form {
     display: flex;
     align-items: center;
@@ -66,6 +74,24 @@ h1 {
     color: #fff;
     cursor: pointer
 }
+
+/* Calendar button */
+.controls-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #2a2b44;
+    background: linear-gradient(180deg, #19213b 0%, #141a30 100%);
+    color: #e6e6e6;
+    text-decoration: none;
+    font-weight: 650;
+    box-shadow: 0 6px 18px rgba(0,0,0,.25);
+    transition: transform .08s ease, filter .12s ease, border-color .12s ease;
+}
+.controls-actions .btn:hover { filter: brightness(1.08); border-color: #3b4aa0; transform: translateY(-1px); }
+.controls-actions .btn:active { transform: translateY(0); }
 
 .seg {
     display: inline-flex;
@@ -99,6 +125,10 @@ h1 {
     }
 }
 
+@media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; gap: 12px; }
+}
+
 .card {
     background: var(--panel);
     border: 1px solid var(--panel-b);
@@ -109,6 +139,12 @@ h1 {
     padding: 12px;
     transition: transform .08s ease, border-color .08s;
     cursor: pointer
+}
+
+@media (max-width: 640px) {
+    .card { gap: 10px; }
+    .poster { width: 90px; height: 135px; }
+    .title { font-size: .98rem; }
 }
 
 .card:active,
@@ -260,6 +296,12 @@ h1 {
     border-bottom: 1px solid #20223a
 }
 
+@media (max-width: 640px) {
+    .modal-header { grid-template-columns: 90px 1fr 36px; gap: 10px; }
+    .m-poster { width: 90px; height: 135px; }
+    .m-title { font-size: 1.05rem; }
+}
+
 .m-poster {
     display: flex;
     flex-direction: column;
@@ -342,6 +384,10 @@ h1 {
     .modal-body {
         grid-template-columns: 1.2fr .8fr
     }
+}
+
+@media (max-width: 640px) {
+    .modal-body { grid-template-columns: 1fr; }
 }
 
 .section-block {

@@ -7,7 +7,7 @@ from django.contrib import messages
 
 class JellyfinClient:
     def __init__(self):
-        # Basis-Einstellungen aus den Django-Settings
+    # Base settings from Django settings
         self.client = settings.JELLYFIN_CLIENT
         self.version = settings.JELLYFIN_VERSION
         self.device = settings.JELLYFIN_DEVICE
@@ -18,13 +18,13 @@ class JellyfinClient:
     def authenticate(self, username, password):
         """Authenticate with Jellyfin and return user info if successful"""
         if not self.server_url:
-            raise ValueError("Keine Server-URL angegeben")
+            raise ValueError("No server URL provided")
 
-        # Stelle sicher, dass die URL ein Protokoll hat
+    # Ensure the URL has a protocol
         if not self.server_url.startswith(('http://', 'https://')):
             self.server_url = f'http://{self.server_url}'
         
-        # Entferne trailing slashes
+    # Remove trailing slashes
         self.server_url = self.server_url.rstrip('/')
 
         headers = {
@@ -57,13 +57,13 @@ class JellyfinClient:
                 'is_admin': data['User'].get('Policy', {}).get('IsAdministrator', False)
             }
         except requests.exceptions.ConnectionError:
-            raise ValueError("Verbindung zum Server nicht möglich. Bitte überprüfen Sie die Server-URL.")
+            raise ValueError("Unable to connect to the server. Please check the server URL.")
         except requests.exceptions.Timeout:
-            raise ValueError("Zeitüberschreitung bei der Verbindung zum Server.")
+            raise ValueError("Connection to the server timed out.")
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
                 return None  # Authentifizierung fehlgeschlagen
-            raise ValueError(f"HTTP-Fehler: {e.response.status_code}")
+            raise ValueError(f"HTTP error: {e.response.status_code}")
         except Exception as e:
             return None
 
@@ -71,7 +71,7 @@ class JellyfinClient:
         """Check if user is admin in Jellyfin"""
         cache_key = f'jellyfin_admin_{user_id}'
         
-        # Check cache first
+    # Check cache first
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
@@ -106,11 +106,11 @@ def jellyfin_admin_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            messages.error(request, 'Sie müssen angemeldet sein, um diese Seite zu sehen.')
+            messages.error(request, 'You must be logged in to view this page.')
             return redirect('accounts:login')
         
         if not request.user.is_jellyfin_admin:
-            messages.error(request, 'Sie benötigen Admin-Rechte, um diese Seite zu sehen.')
+            messages.error(request, 'You need admin rights to view this page.')
             return redirect('index')
             
         return view_func(request, *args, **kwargs)

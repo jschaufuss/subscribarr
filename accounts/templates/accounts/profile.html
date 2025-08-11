@@ -7,7 +7,7 @@
 
 {% block content %}
 <div class="profile-container">
-    <h2>Hallo, {{ user.username }}</h2>
+    <h2>Hello, {{ user.username }}</h2>
 
     {% if messages %}
     <div class="messages">
@@ -18,24 +18,24 @@
     {% endif %}
 
     <div class="profile-section">
-        <h3>E-Mail-Adresse</h3>
+    <h3>Email address</h3>
         <form method="post" class="profile-form compact-form">
             {% csrf_token %}
             <div class="form-row">
-                <label for="id_email">E-Mail</label>
+                <label for="id_email">Email</label>
                 {{ form.email }}
             </div>
-            <button type="submit" class="btn-primary">Speichern</button>
+            <button type="submit" class="btn-primary">Save</button>
         </form>
 
         {% if user.jellyfin_server %}
         <div class="jellyfin-info">
-            <h4>Jellyfin-Verbindung</h4>
+            <h4>Jellyfin connection</h4>
             <p>
                 Server: {{ user.jellyfin_server }}<br>
-                Status: {% if user.jellyfin_token %}Verbunden{% else %}Nicht verbunden{% endif %}<br>
+                Status: {% if user.jellyfin_token %}Connected{% else %}Not connected{% endif %}<br>
                 {% if user.is_jellyfin_admin %}
-                <span class="badge badge-admin">Jellyfin Administrator</span>
+                <span class="badge badge-admin">Jellyfin administrator</span>
                 {% endif %}
             </p>
         </div>
@@ -43,9 +43,9 @@
     </div>
 
     <div class="profile-section">
-        <h3>Meine Abonnements</h3>
+    <h3>My subscriptions</h3>
 
-        <h4>Serien</h4>
+    <h4>Series</h4>
         {% if series_subs %}
         <div class="subscription-list">
             {% for sub in series_subs %}
@@ -53,11 +53,11 @@
                 {% if sub.series_poster %}
                 <img src="{{ sub.series_poster }}" alt="{{ sub.series_title }}" class="subscription-poster">
                 {% else %}
-                <img src="https://via.placeholder.com/80x120?text=Kein+Poster" alt="" class="subscription-poster">
+                <img src="https://via.placeholder.com/80x120?text=No+Poster" alt="" class="subscription-poster">
                 {% endif %}
                 <div class="subscription-info">
                     <div class="subscription-title">{{ sub.series_title }}</div>
-                    <div class="subscription-date">Abonniert am {{ sub.created_at|date:"d.m.Y" }}</div>
+                    <div class="subscription-date">Subscribed on {{ sub.created_at|date:"d.m.Y" }}</div>
                     {% if sub.series_overview %}
                     <div class="subscription-overview">{{ sub.series_overview|truncatechars:100 }}</div>
                     {% endif %}
@@ -66,10 +66,10 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="muted">Keine Serien abonniert.</p>
+    <p class="muted">No series subscribed.</p>
         {% endif %}
 
-        <h4>Filme</h4>
+    <h4>Movies</h4>
         {% if movie_subs %}
         <div class="subscription-list">
             {% for sub in movie_subs %}
@@ -77,11 +77,11 @@
                 {% if sub.poster %}
                 <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
                 {% else %}
-                <img src="https://via.placeholder.com/80x120?text=Kein+Poster" alt="" class="subscription-poster">
+                <img src="https://via.placeholder.com/80x120?text=No+Poster" alt="" class="subscription-poster">
                 {% endif %}
                 <div class="subscription-info">
                     <div class="subscription-title">{{ sub.title }}</div>
-                    <div class="subscription-date">Abonniert am {{ sub.created_at|date:"d.m.Y" }}</div>
+                    <div class="subscription-date">Subscribed on {{ sub.created_at|date:"d.m.Y" }}</div>
                     {% if sub.overview %}
                     <div class="subscription-overview">{{ sub.overview|truncatechars:100 }}</div>
                     {% endif %}
@@ -90,7 +90,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="muted">Keine Filme abonniert.</p>
+    <p class="muted">No movies subscribed.</p>
         {% endif %}
     </div>
 </div>

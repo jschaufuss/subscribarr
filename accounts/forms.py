@@ -10,15 +10,15 @@ class CustomUserCreationForm(UserCreationForm):
         fields = ('username', 'email', 'password1', 'password2')
 
 class CustomUserChangeForm(UserChangeForm):
-    password = None  # Passwort-Änderung über extra Formular
+    password = None  # Password change via separate form
     
     class Meta:
         model = User
         fields = ('email',)
         widgets = {
-            'email': forms.EmailInput(attrs={'class': 'text-input', 'placeholder': 'E-Mail-Adresse'}),
+            'email': forms.EmailInput(attrs={'class': 'text-input', 'placeholder': 'Email address'}),
         }
 
 class JellyfinLoginForm(forms.Form):
-    username = forms.CharField(label='Benutzername', widget=forms.TextInput(attrs={'class': 'form-control'}))
-    password = forms.CharField(label='Passwort', widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    username = forms.CharField(label='Username', widget=forms.TextInput(attrs={'class': 'form-control'}))
+    password = forms.CharField(label='Password', widget=forms.PasswordInput(attrs={'class': 'form-control'}))

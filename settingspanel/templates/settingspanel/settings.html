@@ -1,19 +1,22 @@
 {% load static %}
 <!doctype html>
-<html lang="de">
+<html lang="en">
 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Einstellungen – Subscribarr</title>
+    <title>Settings – Subscribarr</title>
     <link rel="stylesheet" href="{% static 'css/settings.css' %}">
 </head>
 
 <body>
     <div class="wrap">
         <div class="topbar">
-            <div><a href="/" class="btn">← Zurück</a></div>
-            <div><strong>Einstellungen</strong></div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <a href="/" class="btn">← Back</a>
+                <a href="{% url 'settingspanel:subscriptions' %}" class="btn">👥 Subscriptions</a>
+            </div>
+            <div><strong>Settings</strong></div>
             <div></div>
         </div>
 
@@ -29,12 +32,12 @@
                     <div class="row">
                         <label>Jellyfin Server URL</label>
                         {{ jellyfin_form.jellyfin_server_url }}
-                        <div class="help">z.B. http://localhost:8096</div>
+                        <div class="help">e.g., http://localhost:8096</div>
                     </div>
                     <div class="row">
                         <label>Jellyfin API Key</label>
                         {{ jellyfin_form.jellyfin_api_key }}
-                        <div class="help">Admin API Key aus den Jellyfin Einstellungen</div>
+                        <div class="help">Admin API key from your Jellyfin settings</div>
                     </div>
                 </div>
 
@@ -46,8 +49,7 @@
                         <div class="inline">
                             <div class="field">{{ arr_form.sonarr_url }}</div>
                             <div class="inline-actions">
-                                <button class="btn" type="button" onclick="testConnection('sonarr', this)">Test
-                                    Sonarr</button>
+                                <button class="btn" type="button" onclick="testConnection('sonarr', this)">Test Sonarr</button>
                                 <span id="sonarrStatus" class="badge muted">—</span>
                             </div>
                         </div>
@@ -64,8 +66,7 @@
                         <div class="inline">
                             <div class="field">{{ arr_form.radarr_url }}</div>
                             <div class="inline-actions">
-                                <button class="btn" type="button" onclick="testConnection('radarr', this)">Test
-                                    Radarr</button>
+                                <button class="btn" type="button" onclick="testConnection('radarr', this)">Test Radarr</button>
                                 <span id="radarrStatus" class="badge muted">—</span>
                             </div>
                         </div>
@@ -76,32 +77,31 @@
                         {{ arr_form.radarr_api_key }}
                     </div>
 
-                    <div class="help">Klicke „Test …“, um die Verbindung gegen <code>/api/v3/system/status</code> zu
-                        prüfen.</div>
+                    <div class="help">Click “Test …” to verify against <code>/api/v3/system/status</code>.</div>
                 </div>
 
                 <div class="card">
-                    <h2>Mailserver</h2>
+                    <h2>Mail server</h2>
                     <div class="row"><label>Host</label>{{ mail_form.mail_host }}</div>
                     <div class="row"><label>Port</label>{{ mail_form.mail_port }}</div>
-                    <div class="row"><label>Sicherheit</label>{{ mail_form.mail_secure }}</div>
-                    <div class="row"><label>Benutzer</label>{{ mail_form.mail_user }}</div>
-                    <div class="row"><label>Passwort</label>{{ mail_form.mail_password }}</div>
-                    <div class="row"><label>Absender</label>{{ mail_form.mail_from }}</div>
+                    <div class="row"><label>Security</label>{{ mail_form.mail_secure }}</div>
+                    <div class="row"><label>User</label>{{ mail_form.mail_user }}</div>
+                    <div class="row"><label>Password</label>{{ mail_form.mail_password }}</div>
+                    <div class="row"><label>From</label>{{ mail_form.mail_from }}</div>
                 </div>
 
                 <div class="card">
-                    <h2>Konto</h2>
-                    <div class="row"><label>Benutzername</label>{{ account_form.username }}</div>
-                    <div class="row"><label>E-Mail</label>{{ account_form.email }}</div>
-                    <div class="row"><label>Neues Passwort</label>{{ account_form.new_password }}</div>
-                    <div class="row"><label>Passwort wiederholen</label>{{ account_form.repeat_password }}</div>
-                    <div class="help">Nur Oberfläche – Umsetzung Passwortänderung später.</div>
+                    <h2>Account</h2>
+                    <div class="row"><label>Username</label>{{ account_form.username }}</div>
+                    <div class="row"><label>Email</label>{{ account_form.email }}</div>
+                    <div class="row"><label>New password</label>{{ account_form.new_password }}</div>
+                    <div class="row"><label>Repeat password</label>{{ account_form.repeat_password }}</div>
+                    <div class="help">Only UI – implementing password change later.</div>
                 </div>
             </div>
 
             <div style="margin-top:16px">
-                <button class="btn btn-primary" type="submit">Speichern</button>
+                <button class="btn btn-primary" type="submit">Save</button>
             </div>
         </form>
     </div>
@@ -116,25 +116,25 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) {
-                        alert(kind + " Verbindung erfolgreich!");
+            alert(kind + " connection successful!");
                     } else {
-                        alert(kind + " Fehler: " + data.error);
+            alert(kind + " error: " + data.error);
                     }
                 })
-                .catch(err => alert(kind + " Fehler: " + err));
+        .catch(err => alert(kind + " error: " + err));
         }
 
         function setBadge(kind, state, text, tooltip) {
             const el = document.getElementById(kind + "Status");
             if (!el) return;
             el.classList.remove("ok", "err", "muted");
-            el.title = tooltip || "";               // voller Fehlertext im Tooltip
+            el.title = tooltip || "";               // full error text in tooltip
             if (state === "ok") {
                 el.classList.add("ok");
-                el.textContent = "Verbunden";
+                el.textContent = "Connected";
             } else if (state === "err") {
                 el.classList.add("err");
-                el.textContent = "Fehler";
+                el.textContent = "Error";
             } else {
                 el.classList.add("muted");
                 el.textContent = "—";
@@ -147,19 +147,19 @@
             const url = urlEl ? urlEl.value.trim() : "";
             const key = keyEl ? keyEl.value.trim() : "";
 
-            setBadge(kind, "muted", "Teste…");
+            setBadge(kind, "muted", "Testing…");
             if (btnEl) { btnEl.disabled = true; }
 
             fetch(`/settings/test-connection/?kind=${encodeURIComponent(kind)}&url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) {
-                        setBadge(kind, "ok", "Verbunden", "");
+            setBadge(kind, "ok", "Connected", "");
                     } else {
-                        setBadge(kind, "err", "Fehler", data.error || "Unbekannter Fehler");
+            setBadge(kind, "err", "Error", data.error || "Unknown error");
                     }
                 })
-                .catch(err => setBadge(kind, "err", "Fehler", String(err)))
+        .catch(err => setBadge(kind, "err", "Error", String(err)))
                 .finally(() => { if (btnEl) btnEl.disabled = false; });
         }
 

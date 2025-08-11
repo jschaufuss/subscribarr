@@ -4,9 +4,9 @@ from django.utils.translation import gettext_lazy as _
 
 class User(AbstractUser):
     """
-    Custom User Model mit zusätzlichen Feldern und Berechtigungen.
-    Normale User können nur ihre eigenen Daten bearbeiten.
-    Admin-User können alles.
+    Custom User Model with additional fields and permissions.
+    Regular users can only edit their own data.
+    Admin users can edit everything.
     """
     email = models.EmailField(_("email address"), unique=True)
     bio = models.TextField(max_length=500, blank=True)
@@ -26,7 +26,7 @@ class User(AbstractUser):
             client = JellyfinClient()
             return client.is_admin(self.jellyfin_user_id, self.jellyfin_token)
         except:
-            # Im Fehlerfall den lokalen Status verwenden
+            # On error, fall back to local status
             return self.is_admin
             
     @property 

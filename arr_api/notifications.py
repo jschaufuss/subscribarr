@@ -68,7 +68,7 @@ def send_notification_email(
     release_type=None,
 ):
     """
-    Sendet eine Benachrichtigungs-E-Mail an einen User mit erweiterten Details
+    Sends a notification email to a user with extended details
     """
     eff = _set_runtime_email_settings()
     logger.info(
@@ -94,7 +94,7 @@ def send_notification_email(
     context = {
         'username': user.username,
         'title': media_title,
-        'type': 'Serie' if media_type == 'series' else 'Film',
+    'type': 'Series' if media_type == 'series' else 'Movie',
         'overview': overview,
         'poster_url': poster_url,
         'episode_title': episode_title,
@@ -105,7 +105,7 @@ def send_notification_email(
         'release_type': release_type,
     }
 
-    subject = f"Neue {context['type']} verfügbar: {media_title}"
+    subject = f"New {context['type']} available: {media_title}"
     message = render_to_string('arr_api/email/new_media_notification.html', context)
 
     send_mail(
@@ -209,8 +209,8 @@ def get_todays_radarr_calendar():
 
 def check_jellyfin_availability(user, media_id, media_type):
     """
-    Ersetzt: Wir prüfen Verfügbarkeit über Sonarr/Radarr (hasFile),
-    was zuverlässig ist, wenn Jellyfin dieselben Ordner scannt.
+    Replaced: We check availability via Sonarr/Radarr (hasFile),
+    which is reliable if Jellyfin scans the same folders.
     """
     # user is unused here; kept for backward compatibility
     if media_type == 'series':

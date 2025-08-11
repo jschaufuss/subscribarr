@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Subscribarr – Übersicht{% endblock %}
+{% block title %}Subscribarr – Overview{% endblock %}
 
 {% block extra_style %}
 <link rel="stylesheet" href="{% static 'css/index.css' %}">
@@ -20,26 +20,30 @@
     <div class="controls">
         <form method="get" class="controls-form">
             <input type="hidden" name="kind" value="{{ kind|default:'all' }}">
-            <input type="text" name="q" placeholder="Suche Serien/Filme…" value="{{ query|default:'' }}">
-            <input type="number" name="days" min="1" max="365" value="{{ days|default:30 }}" title="Zeitraum in Tagen">
-            <button type="submit">Suchen</button>
+            <input type="text" name="q" placeholder="Search series/movies…" value="{{ query|default:'' }}">
+            <input type="number" name="days" min="1" max="365" value="{{ days|default:30 }}" title="Time range (days)">
+            <button type="submit">Search</button>
         </form>
 
-        <nav class="seg" aria-label="Typ filtern">
+        <nav class="seg" aria-label="Filter type">
             {% with qs=query|urlencode %}
             <a href="?kind=all&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
-                class="{% if kind == 'all' %}active{% endif %}">Alle</a>
+                class="{% if kind == 'all' %}active{% endif %}">All</a>
             <a href="?kind=series&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
-                class="{% if kind == 'series' %}active{% endif %}">Serien</a>
+                class="{% if kind == 'series' %}active{% endif %}">Series</a>
             <a href="?kind=movies&days={{ days }}{% if qs %}&q={{ qs }}{% endif %}"
-                class="{% if kind == 'movies' %}active{% endif %}">Filme</a>
+                class="{% if kind == 'movies' %}active{% endif %}">Movies</a>
             {% endwith %}
         </nav>
+
+        <div class="controls-actions">
+            <a href="/calendar/" class="btn btn-accent" title="Open calendar">📅 Calendar</a>
+        </div>
     </div>
 
     {% if show_series %}
     <div class="section">
-        <h2>Laufende Serien</h2>
+    <h2>Ongoing series</h2>
         <div class="grid">
             {% for s in series_grouped %}
             <div class="card" data-series-id="{{ s.seriesId }}" data-title="{{ s.seriesTitle|escape }}"
@@ -60,7 +64,7 @@
                             <span class="muted" data-dt="{{ e.airDateUtc|default:'' }}"></span>
                         </div>
                         {% empty %}
-                        <div class="muted">Keine kommenden Episoden.</div>
+                        <div class="muted">No upcoming episodes.</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -72,7 +76,7 @@
                 {% endwith %}
             </div>
             {% empty %}
-            <p class="muted">Keine Serien gefunden.</p>
+            <p class="muted">No series found.</p>
             {% endfor %}
         </div>
     </div>
@@ -80,7 +84,7 @@
 
     {% if show_movies %}
     <div class="section">
-        <h2>Anstehende Filme</h2>
+    <h2>Upcoming movies</h2>
         <div class="grid">
             {% for m in movies %}
             <div class="movie-card" data-kind="movie" data-title="{{ m.title|escape }}"
@@ -92,13 +96,13 @@
                 {% endif %}
                 <div class="title">{{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}</div>
                 <div class="muted">
-                    {% if m.inCinemas %}Kino: <span data-dt="{{ m.inCinemas }}"></span>{% endif %}
+                    {% if m.inCinemas %}In theaters: <span data-dt="{{ m.inCinemas }}"></span>{% endif %}
                     {% if m.digitalRelease %}<br>Digital: <span data-dt="{{ m.digitalRelease }}"></span>{% endif %}
-                    {% if m.physicalRelease %}<br>Disc: <span data-dt="{{ m.physicalRelease }}"></span>{% endif %}
+                    {% if m.physicalRelease %}<br>Physical: <span data-dt="{{ m.physicalRelease }}"></span>{% endif %}
                 </div>
             </div>
             {% empty %}
-            <p class="muted">Keine Filme gefunden.</p>
+            <p class="muted">No movies found.</p>
             {% endfor %}
         </div>
     </div>
@@ -118,17 +122,17 @@
                 <div id="mSub" class="m-sub"></div>
                 <div id="mBadges" class="badges"></div>
             </div>
-            <button class="modal-close" title="Schließen" aria-label="Schließen">&times;</button>
+            <button class="modal-close" title="Close" aria-label="Close">&times;</button>
         </div>
 
         <div class="modal-body">
             <div class="section-block">
-                <div class="section-title">Beschreibung</div>
+                <div class="section-title">Overview</div>
                 <div id="mOverview" class="desc muted"></div>
             </div>
 
             <div class="section-block">
-                <div class="section-title">Kommende Episoden</div>
+                <div class="section-title">Upcoming episodes</div>
                 <div class="section-divider"></div>
                 <div id="mEpisodes"></div>
             </div>
@@ -153,6 +157,7 @@
         const mSub = $("#mSub");
         const epSection = mEpisodes.closest(".section-block");
         const subscribeBtn = $("#subscribeBtn");
+    const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('subscribarr-sub') : null;
 
         let lastClickedCard = null;
 
@@ -178,7 +183,7 @@
             return "movie:" + (card.dataset.title || "");
         }
 
-        // Cache für Abonnement-Status
+    // Cache for subscription state
         const subCache = new Map();
 
         async function loadAllSubs() {
@@ -207,7 +212,7 @@
             return k ? subCache.get(k) || false : false;
         }
 
-        async function saveSub(card, on) {
+    async function saveSub(card, on) {
             const k = subKey(card);
             if (!k) return;
             const [type, id] = k.split(":");
@@ -221,45 +226,48 @@
                 });
 
                 if (resp.status === 403) {
-                    // Nicht eingeloggt
+                    // Not logged in
                     window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
                     return;
                 }
 
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-                // Cache aktualisieren
+                // Update cache
                 if (on) {
                     subCache.set(k, true);
                 } else {
                     subCache.delete(k);
                 }
+
+                // Cross-tab/page notify
+                if (bc) bc.postMessage({ type: 'sub_change', kind: type, key: id, on });
             } catch (err) {
                 console.error("Failed to update subscription:", err);
-                // Cache-Update rückgängig machen bei Fehler
+                // Revert optimistic cache on error
                 if (on) {
                     subCache.delete(k);
                 } else {
                     subCache.set(k, true);
                 }
 
-                // Fehlermeldung anzeigen
+                // Show error
                 const errorMsg = document.createElement('div');
                 errorMsg.className = 'error-message';
-                errorMsg.textContent = 'Fehler beim Aktualisieren des Abonnements. Bitte versuchen Sie es später erneut.';
+                errorMsg.textContent = 'Failed to update subscription. Please try again later.';
                 document.body.appendChild(errorMsg);
                 setTimeout(() => errorMsg.remove(), 3000);
             }
         }
         function applySubUI(card, on) {
-            if (card) card.classList.toggle("subscribed", !!on); // grüne Outline via .subscribed (CSS)
+            if (card) card.classList.toggle("subscribed", !!on); // green outline via .subscribed (CSS)
             if (subscribeBtn) {
                 subscribeBtn.textContent = on ? "Unsubscribe" : "Subscribe";
                 subscribeBtn.setAttribute("aria-pressed", on ? "true" : "false");
             }
         }
 
-        // Beim Laden: Alle Abonnements in einem API-Call laden
+    // On load: fetch all subscriptions in a single API call
         (async () => {
             await loadAllSubs();
             const cards = $$(".card, .movie-card");
@@ -268,7 +276,30 @@
             });
         })();
 
-        // ===== Serien-Karten öffnen =====
+        // Listen to subscription changes from other pages (e.g., calendar)
+        if (bc) {
+            bc.onmessage = (evt) => {
+                const msg = evt.data || {};
+                if (msg.type !== 'sub_change') return;
+                const { kind, key, on } = msg;
+                // Keep cache in sync
+                const cacheKey = `${kind}:${key}`;
+                if (on) subCache.set(cacheKey, true); else subCache.delete(cacheKey);
+
+                // Update matching cards
+                const cards = $$(".card, .movie-card");
+                cards.forEach(card => {
+                    const isSeries = card.classList.contains('card') && card.dataset.seriesId;
+                    const isMovie = card.classList.contains('movie-card') && card.dataset.title;
+                    let match = false;
+                    if (kind === 'series' && isSeries && String(card.dataset.seriesId) === String(key)) match = true;
+                    if (kind === 'movie' && isMovie && (card.dataset.title || '') === key) match = true;
+                    if (match) applySubUI(card, on);
+                });
+            };
+        }
+
+    // ===== Open series cards =====
         $$(".card").forEach(card => {
             card.addEventListener("click", () => {
                 lastClickedCard = card;
@@ -278,22 +309,22 @@
                 const poster = card.dataset.poster || "";
                 const overview = card.dataset.overview || "";
 
-                // Episoden aus eingebettetem JSON <script id="eps-<id>">
+                // Episodes from embedded JSON <script id="eps-<id>">
                 let episodes = [];
                 const script = document.getElementById("eps-" + id);
                 if (script) { try { episodes = JSON.parse(script.textContent); } catch { } }
 
-                // Modal befüllen
+                // Fill modal
                 mTitle.textContent = title;
                 mPoster.src = poster || "https://via.placeholder.com/130x195?text=No+Poster";
                 mPoster.alt = title;
-                mOverview.textContent = overview || "Keine Beschreibung verfügbar.";
+                mOverview.textContent = overview || "No overview available.";
 
                 mSub.textContent = episodes.length
-                    ? `${episodes.length} kommende Episode(n)`
-                    : "Keine kommenden Episoden";
+                    ? `${episodes.length} upcoming episode(s)`
+                    : "No upcoming episodes";
 
-                // Genres-Badges, falls data-genres vorhanden
+                // Genre badges if data-genres is present
                 mBadges.innerHTML = "";
                 if (card.dataset.genres) {
                     card.dataset.genres.split(",").map(s => s.trim()).filter(Boolean).forEach(g => {
@@ -304,7 +335,7 @@
                     });
                 }
 
-                // Episodenbereich
+                // Episodes section
                 epSection.style.display = "";
                 mEpisodes.innerHTML = "";
                 if (!episodes.length) {
@@ -323,10 +354,10 @@
                     });
                 }
 
-                // Subscribe-UI für diese Karte setzen
+                // Set subscribe UI for this card
                 applySubUI(lastClickedCard, loadSub(lastClickedCard));
 
-                // Status nochmal aktualisieren zur Sicherheit
+                // Refresh status again for safety
                 loadAllSubs().then(() => {
                     applySubUI(lastClickedCard, loadSub(lastClickedCard));
                 });
@@ -335,7 +366,7 @@
             });
         });
 
-        // ===== Film-Karten öffnen =====
+    // ===== Open movie cards =====
         $$(".movie-card").forEach(card => {
             card.addEventListener("click", () => {
                 lastClickedCard = card;
@@ -347,19 +378,19 @@
                 mTitle.textContent = title;
                 mPoster.src = poster || "https://via.placeholder.com/130x195?text=No+Poster";
                 mPoster.alt = title;
-                mOverview.textContent = overview || "Keine Beschreibung verfügbar.";
+                mOverview.textContent = overview || "No overview available.";
 
                 mSub.textContent = "";
                 mBadges.innerHTML = "";
 
-                // Episodenbereich ausblenden
+                // Hide episodes section
                 epSection.style.display = "none";
                 mEpisodes.innerHTML = "";
 
-                // Subscribe-UI für diese Karte setzen
+                // Set subscribe UI for this card
                 applySubUI(lastClickedCard, loadSub(lastClickedCard));
 
-                // Status nochmal aktualisieren zur Sicherheit
+                // Refresh status again for safety
                 loadAllSubs().then(() => {
                     applySubUI(lastClickedCard, loadSub(lastClickedCard));
                 });
@@ -368,7 +399,7 @@
             });
         });
 
-        // ===== Subscribe-Button im Modal mit Backend-Sync =====
+    // ===== Subscribe button in modal with backend sync =====
         if (subscribeBtn) {
             subscribeBtn.addEventListener("click", async () => {
                 if (!lastClickedCard) return;
@@ -378,16 +409,16 @@
                 // Optimistic UI update
                 applySubUI(lastClickedCard, newState);
 
-                // Backend-Sync
+                // Backend sync
                 await saveSub(lastClickedCard, newState);
 
-                // Status neu laden zur Sicherheit
+                // Refresh status again for safety
                 const finalState = await loadSub(lastClickedCard);
                 applySubUI(lastClickedCard, finalState);
             });
         }
 
-        // ===== Datumsangaben in der Übersicht formatieren =====
+    // ===== Format date/time labels in the overview =====
         document.querySelectorAll("[data-dt]").forEach(el => {
             const v = el.getAttribute("data-dt");
             if (!v) return;

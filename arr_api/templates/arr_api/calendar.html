@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Calendar – Subscribarr{% endblock %}
+
+{% block extra_style %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<style>
+	:root {
+		--primary: #3fb950; /* Subscribarr green */
+		--bg-soft: #0f172a;
+		--card: #0b1224;
+		--text: #e6edf3;
+		--muted: #94a3b8;
+		--border: #1f2a44;
+	}
+	.wrap { max-width: 1200px; margin: 0 auto; padding: 12px; }
+	h1 { margin: 10px 0 18px; font-size: 22px; }
+
+	/* FullCalendar theme tweaks */
+		.fc { --fc-border-color: var(--border); color: var(--text); }
+		.fc-theme-standard { --fc-page-bg-color: var(--card); --fc-neutral-bg-color: #0f172a; }
+		.fc .fc-scrollgrid, .fc .fc-scrollgrid-section > td { background: var(--card); }
+		.fc .fc-col-header, .fc .fc-col-header-cell { background: #0f172a; }
+		.fc .fc-daygrid-day, .fc .fc-timegrid-slot { background: transparent; }
+	.fc .fc-toolbar { gap: 8px; margin-bottom: 12px; display: flex; flex-wrap: wrap; }
+	.fc .fc-toolbar-title { font-size: 18px; }
+	.fc .fc-button { background: #121b33; border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 8px; }
+	.fc .fc-button-primary:not(:disabled).fc-button-active,
+	.fc .fc-button-primary:not(:disabled):active { background: #1a2542; border-color: var(--border); }
+	.fc .fc-button:hover { filter: brightness(1.1); }
+	.fc .fc-button:focus { box-shadow: 0 0 0 2px rgba(63,185,80,.35); }
+	.fc .fc-daygrid-day-number { color: var(--muted); }
+	.fc .fc-day-today { background: rgba(63,185,80,0.08); }
+	.fc .fc-col-header-cell-cushion { color: var(--muted); }
+
+	.fc .fc-daygrid-event, .fc .fc-timegrid-event, .fc .fc-list-event { cursor: pointer; }
+	.fc .fc-daygrid-event { border-radius: 6px; padding: 2px 4px; border: 1px solid var(--border); }
+	.fc .subscribed-event { border-left: 4px solid var(--primary) !important; background: rgba(63,185,80,0.06); }
+	.fc .event-series { border-left-color: #60a5fa; }
+	.fc .event-movie { border-left-color: #f59e0b; }
+	.fc .fc-list {
+		border: 1px solid var(--border);
+		border-radius: 10px; overflow: hidden;
+	}
+	.fc .fc-list-event:hover { background: rgba(255,255,255,0.03); }
+	.event-poster { width: 24px; height: 36px; object-fit: cover; border-radius: 2px; margin-right: 6px; }
+	#calendar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 8px; width: 100%; }
+
+	/* Compact tweaks for phones */
+	@media (max-width: 640px) {
+		.fc .fc-toolbar-title { font-size: 16px; }
+		.fc .fc-button { padding: 5px 8px; border-radius: 8px; }
+		.fc .fc-col-header-cell-cushion { font-size: 12px; }
+		.fc .fc-daygrid-day-number { font-size: 12px; }
+		.fc .fc-daygrid-event { font-size: 12px; padding: 1px 3px; }
+		.event-poster { width: 20px; height: 30px; }
+	}
+
+	/* Modal minor polish in this page */
+	.modal { background: #0b1224; border: 1px solid var(--border); }
+	.btn-subscribe { background: var(--primary); color: #06210e; }
+</style>
+<link rel="stylesheet" href="{% static 'css/index.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+	<h1>Calendar</h1>
+	<div id="calendar"></div>
+</div>
+
+<!-- Modal (same as on the homepage) -->
+<div id="modalBackdrop" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true" style="display:none">
+	<div class="modal">
+		<div class="modal-header">
+			<div class="m-poster-wrap">
+				<div class="m-poster"><img id="mPoster" alt=""></div>
+				<button id="subscribeBtn" class="btn-subscribe" type="button">Subscribe</button>
+			</div>
+			<div>
+				<div id="mTitle" class="m-title"></div>
+				<div id="mSub" class="m-sub"></div>
+				<div id="mBadges" class="badges"></div>
+			</div>
+			<button class="modal-close" title="Close" aria-label="Close">&times;</button>
+		</div>
+
+		<div class="modal-body">
+			<div class="section-block">
+				<div class="section-title">Overview</div>
+				<div id="mOverview" class="desc muted"></div>
+			</div>
+			<div class="section-block">
+				<div class="section-title">Upcoming episodes</div>
+				<div class="section-divider"></div>
+				<div id="mEpisodes"></div>
+			</div>
+		</div>
+	</div>
+ </div>
+
+{% csrf_token %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+(function(){
+	const $ = (s, r=document) => r.querySelector(s);
+	const backdrop = $("#modalBackdrop");
+	const closeBtn = backdrop.querySelector(".modal-close");
+	const mPoster = $("#mPoster");
+	const mTitle = $("#mTitle");
+	const mOverview = $("#mOverview");
+	const mEpisodes = $("#mEpisodes");
+	const mSub = $("#mSub");
+		const subscribeBtn = $("#subscribeBtn");
+	const epSection = mEpisodes.closest(".section-block");
+	const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+			const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('subscribarr-sub') : null;
+
+	function openModal(){ backdrop.style.display = 'flex'; backdrop.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
+	function closeModal(){ backdrop.style.display = 'none'; backdrop.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+	closeBtn.addEventListener('click', closeModal);
+	backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
+	window.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+	// subscription cache
+	const subCache = new Map();
+	async function loadAllSubs(){
+		try {
+			const [s,m] = await Promise.all([
+				fetch('/api/series/subscriptions/'),
+				fetch('/api/movies/subscriptions/')
+			]);
+			if(s.ok){ (await s.json()).forEach(id => subCache.set(`series:${id}`, true)); }
+			if(m.ok){ (await m.json()).forEach(title => subCache.set(`movie:${title}`, true)); }
+		} catch(err){ console.warn('subs load failed', err); }
+	}
+	function isSub(kind, idOrTitle){
+		const key = kind==='series' ? `series:${idOrTitle}` : `movie:${idOrTitle}`;
+		return subCache.has(key);
+	}
+	async function toggleSub(kind, idOrTitle, on){
+		const url = kind==='series'
+			? `/api/series/${on?'subscribe':'unsubscribe'}/${encodeURIComponent(idOrTitle)}/`
+			: `/api/movies/${on?'subscribe':'unsubscribe'}/${encodeURIComponent(idOrTitle)}/`;
+		const resp = await fetch(url, {method:'POST', headers:{'X-CSRFToken': csrf}});
+		if(!resp.ok){ throw new Error('HTTP '+resp.status); }
+		const key = kind==='series' ? `series:${idOrTitle}` : `movie:${idOrTitle}`;
+		if(on) subCache.set(key, true); else subCache.delete(key);
+	}
+
+		let currentEvent = null;
+		let calendar = null;
+	function showEvent(ev){
+		currentEvent = ev;
+		const p = ev.extendedProps || {};
+		const kind = p.kind;
+		const poster = p.poster || 'https://via.placeholder.com/130x195?text=No+Poster';
+		mPoster.src = poster;
+		if(kind==='series'){
+			mTitle.textContent = `${p.seriesTitle} — S${p.seasonNumber}E${p.episodeNumber}${p.episodeTitle?(' · '+p.episodeTitle):''}`;
+			mOverview.textContent = p.overview || '';
+			epSection.style.display = 'none';
+			mEpisodes.innerHTML = '';
+			mSub.textContent = new Date(ev.start).toLocaleString();
+		} else {
+			mTitle.textContent = p.title || ev.title;
+			mOverview.textContent = p.overview || '';
+			epSection.style.display = 'none';
+			mEpisodes.innerHTML = '';
+			mSub.textContent = new Date(ev.start).toLocaleDateString();
+		}
+		subscribeBtn.textContent = isSub(kind, kind==='series'?p.seriesId:(p.title||'')) ? 'Unsubscribe' : 'Subscribe';
+		openModal();
+	}
+		subscribeBtn.addEventListener('click', async ()=>{
+		if(!currentEvent) return;
+		const p = currentEvent.extendedProps || {};
+		const kind = p.kind;
+		const key = kind==='series'? p.seriesId : (p.title||'');
+			const newState = !isSub(kind, key);
+			// Optimistic UI
+			subscribeBtn.textContent = newState ? 'Unsubscribe' : 'Subscribe';
+			// Update event visuals immediately
+			try {
+				if(currentEvent){
+					currentEvent.setExtendedProp('subscribed', newState);
+					// Also tag by kind for subtle color; ensure classNames contains baseline kind
+					const base = [];
+					if((currentEvent.extendedProps||{}).kind === 'series') base.push('event-series');
+					if((currentEvent.extendedProps||{}).kind === 'movie') base.push('event-movie');
+					if(newState) base.push('subscribed-event');
+					currentEvent.setProp('classNames', base);
+					if(calendar) calendar.rerenderEvents();
+				}
+			} catch(e) { /* ignore */ }
+				try {
+					await toggleSub(kind, key, newState);
+					if(bc) bc.postMessage({ type:'sub_change', kind, key, on:newState });
+				} catch(err) {
+				console.error(err);
+				// revert visual/state on failure
+				try {
+					if(currentEvent){
+						currentEvent.setExtendedProp('subscribed', !newState);
+						const base = [];
+						if((currentEvent.extendedProps||{}).kind === 'series') base.push('event-series');
+						if((currentEvent.extendedProps||{}).kind === 'movie') base.push('event-movie');
+						if(!newState) base.push('subscribed-event');
+						currentEvent.setProp('classNames', base);
+						if(calendar) calendar.rerenderEvents();
+					}
+				} catch(e) { /* ignore */ }
+			}
+	});
+
+				document.addEventListener('DOMContentLoaded', async function() {
+		await loadAllSubs();
+		const calendarEl = document.getElementById('calendar');
+				const isCompact = () => (calendarEl?.clientWidth || window.innerWidth) < 720;
+				const compact = isCompact();
+				calendar = new FullCalendar.Calendar(calendarEl, {
+					initialView: compact ? 'listWeek' : 'dayGridMonth',
+			height: 'auto',
+			locale: 'en',
+					headerToolbar: compact
+						? { left:'prev,next', center:'title', right:'listWeek,dayGridMonth' }
+						: { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,listWeek' },
+					buttonText: { listWeek: 'List', dayGridMonth: 'Month', timeGridWeek: 'Week', today: 'Today' },
+				firstDay: 1,
+				nowIndicator: true,
+					dayMaxEventRows: compact ? 2 : 5,
+					expandRows: true,
+					handleWindowResize: true,
+					windowResize: function(){
+						const c = isCompact();
+						const should = c ? 'listWeek' : 'dayGridMonth';
+						if(calendar.view.type !== should){ calendar.changeView(should); }
+						calendar.setOption('headerToolbar', c
+							? { left:'prev,next', center:'title', right:'listWeek,dayGridMonth' }
+							: { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,listWeek' }
+						);
+						calendar.setOption('dayMaxEventRows', c ? 2 : 5);
+						calendar.setOption('displayEventTime', !c);
+					},
+				eventClassNames: function(arg){
+					const p = arg.event.extendedProps || {};
+					const classes = [];
+					if(p.kind === 'series') classes.push('event-series');
+					if(p.kind === 'movie') classes.push('event-movie');
+					if(p.subscribed) classes.push('subscribed-event');
+					return classes;
+				},
+			events: async (info, success, failure) => {
+				try {
+					const url = `/api/calendar/events/?days={{ days|default:60 }}`;
+					const resp = await fetch(url);
+					const data = await resp.json();
+						const evs = (data.events||[]);
+					success(evs);
+				} catch(err){ failure(err); }
+			},
+			eventClick: function(arg){ arg.jsEvent.preventDefault(); showEvent(arg.event); },
+			eventDidMount: function(info){
+				const p = info.event.extendedProps || {};
+				if(info.view.type.startsWith('list') && p.poster){
+					const img = document.createElement('img');
+					img.src = p.poster; img.className = 'event-poster';
+					const titleEl = info.el.querySelector('.fc-list-event-title');
+					if(titleEl){ titleEl.prepend(img); }
+				}
+			}
+		});
+		calendar.render();
+			// Listen for sub changes from other tabs/pages
+			if(bc){
+				bc.onmessage = (evt)=>{
+					const msg = evt.data || {};
+					if(msg.type !== 'sub_change') return;
+					const {kind, key, on} = msg;
+					try {
+						calendar.getEvents().forEach(ev=>{
+							const p = ev.extendedProps || {};
+							const match = (kind==='series' && String(p.seriesId)===String(key)) || (kind==='movie' && (p.title||'')===key);
+							if(match){
+								ev.setExtendedProp('subscribed', on);
+								const base = [];
+								if(p.kind==='series') base.push('event-series');
+								if(p.kind==='movie') base.push('event-movie');
+								if(on) base.push('subscribed-event');
+								ev.setProp('classNames', base);
+							}
+						});
+						calendar.rerenderEvents();
+					} catch(e) { /* ignore */ }
+				};
+			}
+	});
+})();
+</script>
+{% endblock %}

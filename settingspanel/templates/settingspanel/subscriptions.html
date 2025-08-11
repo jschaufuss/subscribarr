@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Subscriptions – Admin{% endblock %}
+{% block extra_style %}
+<style>
+.wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.filters { display:flex; gap:8px; margin: 10px 0 16px; }
+.filters input { padding: 10px 12px; border-radius: 10px; border: 1px solid #2a2a34; background:#111119; color:#e6e6e6; min-width: 240px; }
+.section { margin-top: 20px; }
+.grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card { background:#12121a; border:1px solid #1f2030; border-radius:12px; padding:12px; display:flex; gap:12px; }
+.poster { width: 90px; height: 135px; border-radius:8px; overflow:hidden; background:#222233; flex:0 0 auto; }
+.poster img { width:100%; height:100%; object-fit: cover; display:block; }
+.meta { flex:1 1 auto; min-width:0; }
+.title { font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.muted { color:#9aa0b4; font-size:.9rem; }
+.user { font-weight:600; }
+
+ /* user list */
+ .users { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:10px; }
+ .user-item { background:#10121b; border:1px solid #1f2030; border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; transition: transform .08s ease, border-color .12s ease; }
+ .user-item:hover { transform: translateY(-1px); border-color:#2a2b44; }
+ .badge { background:#171a26; border:1px solid #2a2b44; color:#cfd3ea; border-radius:999px; padding:2px 8px; font-size:.85rem; }
+
+ /* modal fix */
+ .modal-backdrop { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(10,12,20,.55); backdrop-filter: blur(4px); z-index: 1000; }
+ .modal { width:min(720px, 100%); max-height:92vh; overflow:auto; background: linear-gradient(180deg, #10121b 0%, #0d0f16 100%); border:1px solid #2a2b44; border-radius: 14px; }
+ .modal-header { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid #20223a; background: rgba(13,15,22,.85); position:sticky; top:0; }
+ .modal-close { margin-left:auto; background:#1a1f33; color:#c9cbe3; border:1px solid #2a2b44; width:34px; height:34px; border-radius:10px; cursor:pointer; }
+ .section-block { background:#101327; border:1px solid #20223a; border-radius:12px; padding:14px; margin:12px; }
+ .section-title { font-weight:650; margin-bottom:8px; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>Subscriptions overview</h1>
+  <div class="filters">
+    <input type="text" id="q" placeholder="Search user/series/movies…">
+  </div>
+
+  <div class="section">
+    <h2>Users</h2>
+    <p class="muted">Tap a user to view all subscriptions.</p>
+    <div class="users" id="usersList">
+      {% for u in user_stats %}
+      <div class="user-item" data-user="{{ u.username_lower }}">
+        <div>{{ u.username }}</div>
+        <div class="badge">{{ u.total_count }}</div>
+      </div>
+      {% empty %}
+      <p class="muted">No subscriptions yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+  <h2>Series</h2>
+    <div class="grid" id="seriesGrid">
+      {% for s in series %}
+      <div class="card" data-user="{{ s.user.username|lower }}" data-title="{{ s.series_title|lower }}" data-id="{{ s.series_id }}">
+        <div class="poster">
+          {% if s.series_poster %}
+          <img src="{{ s.series_poster }}" alt="{{ s.series_title }}">
+          {% else %}
+          <img src="https://via.placeholder.com/90x135?text=No+Poster" alt="">
+          {% endif %}
+        </div>
+        <div class="meta">
+          <div class="title">{{ s.series_title }}</div>
+          <div class="muted">User: <span class="user">{{ s.user.username }}</span></div>
+          <div class="muted">SeriesId: {{ s.series_id }}</div>
+          <div class="muted">Since: {{ s.created_at }}</div>
+        </div>
+      </div>
+      {% empty %}
+  <p class="muted">No series subscriptions.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+  <h2>Movies</h2>
+    <div class="grid" id="moviesGrid">
+      {% for m in movies %}
+      <div class="card" data-user="{{ m.user.username|lower }}" data-title="{{ m.title|lower }}" data-id="{{ m.movie_id }}">
+        <div class="poster">
+          {% if m.poster %}
+          <img src="{{ m.poster }}" alt="{{ m.title }}">
+          {% else %}
+          <img src="https://via.placeholder.com/90x135?text=No+Poster" alt="">
+          {% endif %}
+        </div>
+        <div class="meta">
+          <div class="title">{{ m.title }}</div>
+          <div class="muted">User: <span class="user">{{ m.user.username }}</span></div>
+          <div class="muted">MovieId: {{ m.movie_id }}</div>
+          <div class="muted">Since: {{ m.created_at }}</div>
+        </div>
+      </div>
+      {% empty %}
+  <p class="muted">No movie subscriptions.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const q = document.getElementById('q');
+  function filter(){
+    const v = (q.value||'').toLowerCase();
+    [document.getElementById('seriesGrid'), document.getElementById('moviesGrid')].forEach(grid=>{
+      if(!grid) return; Array.from(grid.children).forEach(card=>{
+        const text = (card.dataset.user + ' ' + card.dataset.title).toLowerCase();
+        card.style.display = text.includes(v) ? '' : 'none';
+      });
+    });
+    const users = document.getElementById('usersList');
+    if(users){ Array.from(users.children).forEach(item=>{
+      const username = item.querySelector('div')?.textContent?.toLowerCase() || '';
+      item.style.display = username.includes(v) ? '' : 'none';
+    }); }
+  }
+  q.addEventListener('input', filter);
+
+  // Group-by-user popup
+  const modal = document.createElement('div');
+  modal.className = 'modal-backdrop';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:720px">
+      <div class="modal-header">
+        <div style="font-weight:700" id="uTitle"></div>
+        <button class="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="section-block"><div class="section-title">Series</div><div id="uSeries"></div></div>
+        <div class="section-block"><div class="section-title">Movies</div><div id="uMovies"></div></div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const closeBtn = modal.querySelector('.modal-close');
+  const uTitle = modal.querySelector('#uTitle');
+  const uSeries = modal.querySelector('#uSeries');
+  const uMovies = modal.querySelector('#uMovies');
+  function open(){ modal.style.display='flex'; document.body.style.overflow='hidden'; }
+  function close(){ modal.style.display='none'; document.body.style.overflow=''; }
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
+
+  function renderList(container, items){
+    container.innerHTML = '';
+    if(!items.length){ container.innerHTML = '<div class="muted">—</div>'; return; }
+    items.forEach(it=>{
+      const row = document.createElement('div');
+      row.style.display = 'flex'; row.style.gap='10px'; row.style.alignItems='center'; row.style.margin='6px 0';
+      const poster = document.createElement('img');
+      poster.src = it.poster || 'https://via.placeholder.com/50x75?text=No+Poster';
+      poster.style.width='50px'; poster.style.height='75px'; poster.style.objectFit='cover'; poster.style.borderRadius='6px';
+      const meta = document.createElement('div');
+      meta.innerHTML = `<div style="font-weight:600">${it.title}</div><div class="muted">ID: ${it.id}</div>`;
+      row.appendChild(poster); row.appendChild(meta);
+      container.appendChild(row);
+    });
+  }
+
+  function gatherForUser(username){
+    const series = Array.from(document.querySelectorAll('#seriesGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
+      const idFromAttr = c.dataset.id || '';
+      let idFromText = '';
+      if(!idFromAttr){
+        const text = Array.from(c.querySelectorAll('.muted')).map(el=>el.textContent).join(' ');
+        const m = text.match(/SeriesId:\s*(\d+)/i); idFromText = m ? m[1] : '';
+      }
+      return {
+        title: c.querySelector('.title')?.textContent || '',
+        id: idFromAttr || idFromText,
+        poster: c.querySelector('img')?.src || ''
+      };
+    });
+    const movies = Array.from(document.querySelectorAll('#moviesGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
+      const idFromAttr = c.dataset.id || '';
+      let idFromText = '';
+      if(!idFromAttr){
+        const text = Array.from(c.querySelectorAll('.muted')).map(el=>el.textContent).join(' ');
+        const m = text.match(/MovieId:\s*(\d+)/i); idFromText = m ? m[1] : '';
+      }
+      return {
+        title: c.querySelector('.title')?.textContent || '',
+        id: idFromAttr || idFromText,
+        poster: c.querySelector('img')?.src || ''
+      };
+    });
+    return {series, movies};
+  }
+
+  function openForUser(usernameDisplay){
+    const username = usernameDisplay.trim().toLowerCase();
+    const {series, movies} = gatherForUser(username);
+    uTitle.textContent = `Subscriptions for ${usernameDisplay.trim()}`;
+    renderList(uSeries, series);
+    renderList(uMovies, movies);
+    open();
+  }
+
+  document.querySelectorAll('.user').forEach(uEl=>{
+    uEl.style.cursor='pointer';
+    uEl.title='Show all subscriptions for this user';
+    uEl.addEventListener('click', ()=> openForUser(uEl.textContent));
+  });
+
+  document.querySelectorAll('.user-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+      const name = item.querySelector('div')?.textContent || '';
+      openForUser(name);
+    });
+  });
+})();
+</script>
+{% endblock %}

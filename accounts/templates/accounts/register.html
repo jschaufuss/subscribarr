@@ -2,14 +2,14 @@
 
 {% block content %}
 <div class="auth-container">
-    <h2>Registrieren</h2>
+    <h2>Register</h2>
     <form method="post" class="auth-form">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit" class="btn-primary">Registrieren</button>
+    <button type="submit" class="btn-primary">Register</button>
     </form>
     <div class="auth-links">
-        <p>Bereits ein Konto? <a href="{% url 'accounts:login' %}">Jetzt anmelden</a></p>
+    <p>Already have an account? <a href="{% url 'accounts:login' %}">Sign in</a></p>
     </div>
 </div>
 {% endblock %}

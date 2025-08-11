@@ -17,7 +17,7 @@ class RegisterView(CreateView):
     
     def form_valid(self, form):
         response = super().form_valid(form)
-        messages.success(self.request, 'Registrierung erfolgreich! Sie können sich jetzt anmelden.')
+        messages.success(self.request, 'Registration successful! You can now sign in.')
         return response
 
 @login_required
@@ -26,12 +26,12 @@ def profile(request):
         form = CustomUserChangeForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
-            messages.success(request, 'E-Mail gespeichert.')
+            messages.success(request, 'Email saved.')
             return redirect('accounts:profile')
     else:
         form = CustomUserChangeForm(instance=request.user)
 
-    # Lade Abonnements
+    # Load subscriptions
     series_subs = request.user.series_subscriptions.all()
     movie_subs = request.user.movie_subscriptions.all()
 
@@ -40,7 +40,7 @@ def profile(request):
         from settingspanel.models import AppSettings
         from arr_api.services import sonarr_get_series, radarr_lookup_movie_by_title
         cfg = AppSettings.current()
-        # Serien
+    # Series
         for sub in series_subs:
             if not sub.series_poster and sub.series_id:
                 details = sonarr_get_series(sub.series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
@@ -51,7 +51,7 @@ def profile(request):
                     if not sub.series_genres:
                         sub.series_genres = details.get('series_genres') or []
                     sub.save(update_fields=['series_poster', 'series_overview', 'series_genres'])
-        # Filme
+    # Movies
         for sub in movie_subs:
             if not sub.poster:
                 details = radarr_lookup_movie_by_title(sub.title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
@@ -84,7 +84,7 @@ def jellyfin_login(request):
             app_settings = AppSettings.current()
             server_url = app_settings.get_jellyfin_url()
             if not server_url:
-                messages.error(request, 'Jellyfin Server ist nicht konfiguriert. Bitte Setup abschließen.')
+                messages.error(request, 'Jellyfin server is not configured. Please complete setup.')
                 return render(request, 'accounts/login.html', {'form': form})
 
             try:
@@ -93,7 +93,7 @@ def jellyfin_login(request):
                 auth_result = client.authenticate(username, password)
                 
                 if not auth_result:
-                    messages.error(request, 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Anmeldedaten.')
+                    messages.error(request, 'Sign in failed. Please check your credentials.')
                     return render(request, 'accounts/login.html', {'form': form})
 
                 # Existierenden User finden oder neu erstellen
@@ -116,13 +116,13 @@ def jellyfin_login(request):
                     user.save()
 
                 login(request, user)
-                messages.success(request, f'Willkommen, {username}!')
+                messages.success(request, f'Welcome, {username}!')
                 return redirect('arr_api:index')
                     
             except ValueError as e:
                 messages.error(request, str(e))
             except Exception as e:
-                messages.error(request, f'Verbindungsfehler: {str(e)}')
+                messages.error(request, f'Connection error: {str(e)}')
         # invalid form or error path
         return render(request, 'accounts/login.html', {'form': form})
 

@@ -12,7 +12,7 @@ class SeriesSubscription(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ['user', 'series_id']  # Ein User kann eine Serie nur einmal abonnieren
+        unique_together = ['user', 'series_id']  # A user can subscribe to a series only once
 
     def __str__(self):
         return self.series_title
@@ -29,18 +29,16 @@ class MovieSubscription(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ['user', 'movie_id']  # Ein User kann einen Film nur einmal abonnieren
+        unique_together = ['user', 'movie_id']  # A user can subscribe to a movie only once
 
     def __str__(self):
         return self.title
 
 class SentNotification(models.Model):
-    """
-    Speichert gesendete Benachrichtigungen um Duplikate zu vermeiden
-    """
+    """Store sent notifications to avoid duplicates"""
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     media_id = models.IntegerField()
-    media_type = models.CharField(max_length=10)  # 'series' oder 'movie'
+    media_type = models.CharField(max_length=10)  # 'series' or 'movie'
     media_title = models.CharField(max_length=255)
     air_date = models.DateField()
     sent_at = models.DateTimeField(auto_now_add=True)

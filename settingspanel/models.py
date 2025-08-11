@@ -1,7 +1,7 @@
 from django.db import models
 
 class AppSettings(models.Model):
-    # Singleton-Pattern über feste ID
+    # Singleton pattern via fixed ID
     singleton_id = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
 
     # Jellyfin
@@ -20,7 +20,7 @@ class AppSettings(models.Model):
     mail_secure = models.CharField(
         max_length=10, blank=True, null=True,
         choices=(
-            ("", "Kein TLS/SSL"),
+            ("", "No TLS/SSL"),
             ("starttls", "STARTTLS (Port 587)"),
             ("ssl", "SSL/TLS (Port 465)"),
             ("tls", "TLS (alias STARTTLS)"),
@@ -30,7 +30,7 @@ class AppSettings(models.Model):
     mail_password = models.CharField(max_length=255, blank=True, null=True)
     mail_from = models.EmailField(blank=True, null=True)
 
-    # „Account“
+    # Account
     acc_username = models.CharField(max_length=150, blank=True, null=True)
     acc_email = models.EmailField(blank=True, null=True)
 
