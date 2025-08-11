@@ -6,6 +6,17 @@ Subscribarr is a notification tool for the *Arr ecosystem (Sonarr, Radarr) and J
 
 ---
 
+## Screenshots
+
+![Overview](screenshots/SCR-20250811-lfod.png)
+![Settings](screenshots/SCR-20250811-lfrm.png)
+![Subscriptions](screenshots/SCR-20250811-lfvc.png)
+![Search](screenshots/SCR-20250811-lfyq.png)
+![Details](screenshots/SCR-20250811-lgau.png)
+![Notifications](screenshots/SCR-20250811-lgcz.png)
+
+---
+
 ## Features
 
 - **Login via Jellyfin** (use your Jellyfin account; admin status respected)
@@ -40,18 +51,38 @@ docker compose up -d --build
 
 ### 2) Minimal `docker-compose.yml` (example)
 ```yaml
+---
 services:
   subscribarr:
     build: .
+    container_name: subscribarr
     ports:
-      - "8000:8000"
+      - "8081:8000"
     environment:
+      # Django
       - DJANGO_DEBUG=true
       - DJANGO_ALLOWED_HOSTS=*
       - DJANGO_SECRET_KEY=change-me
       - DB_PATH=/app/data/db.sqlite3
       - NOTIFICATIONS_ALLOW_DUPLICATES=false
-      # Jellyfin / Arr / Mail (see table below)
+      # App Settings (optional, otherwise use first-run setup)
+      #- JELLYFIN_URL=
+      #- JELLYFIN_API_KEY=
+      #- SONARR_URL=
+      #- SONARR_API_KEY=
+      #- RADARR_URL=
+      #- RADARR_API_KEY=
+      #- MAIL_HOST=
+      #- MAIL_PORT=
+      #- MAIL_SECURE=
+      #- MAIL_USER=
+      #- MAIL_PASSWORD=
+      #- MAIL_FROM=
+      # Admin bootstrap (optional)
+      #- ADMIN_USERNAME=
+      #- ADMIN_PASSWORD=
+      #- ADMIN_EMAIL=
+      # Cron schedule (default every 30min)
       - CRON_SCHEDULE=*/30 * * * *
     volumes:
       - subscribarr-data:/app/data
