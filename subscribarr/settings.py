@@ -104,17 +104,19 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://subscribarr.local.js-devop.de',
-    # Weitere vertrauenswürdige Domains können hier hinzugefügt werden
-]
+# Configure CSRF trusted origins via env var for container deployments.
+# Example: DJANGO_CSRF_TRUSTED_ORIGINS="https://subscribarr.example.com,https://app.example.org"
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+if not CSRF_TRUSTED_ORIGINS:
+    # Fallback default (can be overridden by env)
+    CSRF_TRUSTED_ORIGINS = ['https://subscribarr.local.js-devop.de']
 
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'de-de'
+LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'Europe/Berlin'
 
