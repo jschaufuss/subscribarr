@@ -61,10 +61,15 @@ services:
     environment:
       # Django
       - DJANGO_DEBUG=true
+      - USE_X_FORWARDED_HOST=true
+      - DJANGO_SECURE_PROXY_SSL_HEADER=true
+      - DJANGO_CSRF_COOKIE_SECURE=true
+      - DJANGO_SESSION_COOKIE_SECURE=true
       - DJANGO_ALLOWED_HOSTS=*
       - DJANGO_SECRET_KEY=change-me
       - DB_PATH=/app/data/db.sqlite3
       - NOTIFICATIONS_ALLOW_DUPLICATES=false
+      - DJANGO_CSRF_TRUSTED_ORIGINS="https://subscribarr.local.js-devop.de"
       # App Settings (optional, otherwise use first-run setup)
       #- JELLYFIN_URL=
       #- JELLYFIN_API_KEY=
@@ -85,11 +90,8 @@ services:
       # Cron schedule (default every 30min)
       - CRON_SCHEDULE=*/30 * * * *
     volumes:
-      - subscribarr-data:/app/data
+      - ./data:/app/data
     restart: unless-stopped
-
-volumes:
-  subscribarr-data:
 ```
 
 ---
