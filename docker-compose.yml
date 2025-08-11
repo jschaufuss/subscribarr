@@ -13,7 +13,6 @@ services:
       - DB_PATH=/app/data/db.sqlite3
       - NOTIFICATIONS_ALLOW_DUPLICATES=false
       - DJANGO_CSRF_TRUSTED_ORIGINS="https://subscribarr.example.com,https://app.example.org"
-      - DJANGO_ALLOWED_HOSTS="subscribarr.example.com,app.example.org"
       # App Settings (optional, otherwise use first-run setup)
       #- JELLYFIN_URL=
       #- JELLYFIN_API_KEY=
