@@ -117,7 +117,7 @@ services:
 
 ## First Run
 
-1. Start the container (or dev server) and open `http://<host>:8000`.  
+1. Start the container (or dev server) and open `http://<host>:8081`.  
 2. Complete the **first-time setup**: Jellyfin URL/API key (required), optional Sonarr/Radarr, SMTP.  
 3. **Sign in** with Jellyfin credentials (admin users in Jellyfin become admins in Subscribarr).  
 4. Adjust settings later at `/settings/`.
