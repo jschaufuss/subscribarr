@@ -183,4 +183,5 @@ DEFAULT_FROM_EMAIL = None  # Will be set from AppSettings
 
 # Notifications / Debug
 # If True, duplicate suppression is disabled and emails can be resent on every run.
-NOTIFICATIONS_ALLOW_DUPLICATES = os.getenv('NOTIFICATIONS_ALLOW_DUPLICATES', 'True').lower() == 'true'
+# Default is False to avoid accidental duplicate mails in local/dev runs.
+NOTIFICATIONS_ALLOW_DUPLICATES = os.getenv('NOTIFICATIONS_ALLOW_DUPLICATES', 'False').lower() == 'true'
