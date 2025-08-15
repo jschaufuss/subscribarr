@@ -26,7 +26,7 @@ def profile(request):
         form = CustomUserChangeForm(request.POST, instance=request.user)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Email saved.')
+            messages.success(request, 'Profile saved.')
             return redirect('accounts:profile')
     else:
         form = CustomUserChangeForm(instance=request.user)

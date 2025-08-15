@@ -91,6 +91,20 @@
                 </div>
 
                 <div class="card">
+                    <h2>Notifications</h2>
+                    <h3>ntfy</h3>
+                    <div class="row"><label>Server URL</label>{{ notify_form.ntfy_server_url }}</div>
+                    <div class="row"><label>Default topic</label>{{ notify_form.ntfy_topic_default }}</div>
+                    <div class="row"><label>Username</label>{{ notify_form.ntfy_user }}</div>
+                    <div class="row"><label>Password</label>{{ notify_form.ntfy_password }}</div>
+                    <div class="row"><label>Bearer token</label>{{ notify_form.ntfy_token }}</div>
+
+                    <h3 style="margin-top:12px;">Apprise</h3>
+                    <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
+                    <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
+                </div>
+
+                <div class="card">
                     <h2>Account</h2>
                     <div class="row"><label>Username</label>{{ account_form.username }}</div>
                     <div class="row"><label>Email</label>{{ account_form.email }}</div>

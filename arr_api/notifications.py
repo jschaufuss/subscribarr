@@ -2,7 +2,6 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.db import transaction
 from settingspanel.models import AppSettings
 # from accounts.utils import JellyfinClient  # not needed for availability; use Sonarr/Radarr instead
 import requests
@@ -69,7 +68,7 @@ def send_notification_email(
     release_type=None,
 ):
     """
-    Sends a notification email to a user with extended details
+    Sendet eine Benachrichtigungs-E-Mail an einen User mit erweiterten Details
     """
     eff = _set_runtime_email_settings()
     logger.info(
@@ -95,7 +94,7 @@ def send_notification_email(
     context = {
         'username': user.username,
         'title': media_title,
-    'type': 'Series' if media_type == 'series' else 'Movie',
+        'type': 'Serie' if media_type == 'series' else 'Film',
         'overview': overview,
         'poster_url': poster_url,
         'episode_title': episode_title,
@@ -106,17 +105,89 @@ def send_notification_email(
         'release_type': release_type,
     }
 
-    subject = f"New {context['type']} available: {media_title}"
+    subject = f"Neue {context['type']} verfügbar: {media_title}"
     message = render_to_string('arr_api/email/new_media_notification.html', context)
 
-    send_mail(
-        subject=subject,
-        message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        html_message=message,
-        fail_silently=False,
-    )
+    # Fallback to dispatch respecting user preference
+    try:
+        # strip HTML tags for body_text basic fallback
+        import re
+        body_text = re.sub('<[^<]+?>', '', message)
+    except Exception:
+        body_text = message
+    _dispatch_user_notification(user, subject=subject, body_text=body_text, html_message=message)
+
+
+def _send_ntfy(user, title: str, message: str, click_url: str | None = None):
+    cfg = AppSettings.current()
+    base = (cfg.ntfy_server_url or '').strip().rstrip('/')
+    if not base:
+        return False
+    topic = (user.ntfy_topic or cfg.ntfy_topic_default or '').strip()
+    if not topic:
+        return False
+    url = f"{base}/{topic}"
+    headers = {"Title": title}
+    if click_url:
+        headers["Click"] = click_url
+    if cfg.ntfy_token:
+        headers["Authorization"] = f"Bearer {cfg.ntfy_token}"
+    elif cfg.ntfy_user and cfg.ntfy_password:
+        # basic auth via requests
+        auth = (cfg.ntfy_user, cfg.ntfy_password)
+    else:
+        auth = None
+    try:
+        r = requests.post(url, data=message.encode('utf-8'), headers=headers, timeout=8, auth=auth if 'auth' in locals() else None)
+        return r.status_code // 100 == 2
+    except Exception:
+        return False
+
+
+def _send_apprise(user, title: str, message: str):
+    # Lazy import apprise, optional dependency
+    try:
+        import apprise
+    except Exception:
+        return False
+    cfg = AppSettings.current()
+    urls = []
+    if user.apprise_url:
+        urls.extend([u.strip() for u in str(user.apprise_url).splitlines() if u.strip()])
+    if cfg.apprise_default_url:
+        urls.extend([u.strip() for u in str(cfg.apprise_default_url).splitlines() if u.strip()])
+    if not urls:
+        return False
+    app = apprise.Apprise()
+    for u in urls:
+        app.add(u)
+    return app.notify(title=title, body=message)
+
+
+def _dispatch_user_notification(user, subject: str, body_text: str, html_message: str | None = None, click_url: str | None = None):
+    channel = getattr(user, 'notification_channel', 'email') or 'email'
+    if channel == 'ntfy':
+        ok = _send_ntfy(user, title=subject, message=body_text, click_url=click_url)
+        if ok:
+            return True
+        # fallback to email
+    if channel == 'apprise':
+        ok = _send_apprise(user, title=subject, message=body_text)
+        if ok:
+            return True
+        # fallback to email
+    try:
+        send_mail(
+            subject=subject,
+            message=body_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return True
+    except Exception:
+        return False
 
 
 def _get_arr_cfg():
@@ -210,8 +281,8 @@ def get_todays_radarr_calendar():
 
 def check_jellyfin_availability(user, media_id, media_type):
     """
-    Replaced: We check availability via Sonarr/Radarr (hasFile),
-    which is reliable if Jellyfin scans the same folders.
+    Ersetzt: Wir prüfen Verfügbarkeit über Sonarr/Radarr (hasFile),
+    was zuverlässig ist, wenn Jellyfin dieselben Ordner scannt.
     """
     # user is unused here; kept for backward compatibility
     if media_type == 'series':
@@ -255,62 +326,67 @@ def check_and_notify_users():
             if season is None or number is None:
                 continue
 
+            # duplicate guard (per series per day per user)
+            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                already_notified = SentNotification.objects.filter(
+                    media_id=sub.series_id,
+                    media_type='series',
+                    air_date=today,
+                    user=sub.user
+                ).exists()
+                if already_notified:
+                    continue
+
             # check availability via Sonarr hasFile
             if sonarr_episode_has_file(sub.series_id, season, number):
                 if not sub.user.email:
                     continue
-                # After confirming availability, reserve once per user/series/day
-                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                    try:
-                        with transaction.atomic():
-                            obj, created = SentNotification.objects.get_or_create(
-                                user=sub.user,
-                                media_id=sub.series_id,
-                                media_type='series',
-                                air_date=today,
-                                defaults={
-                                    'media_title': sub.series_title,
-                                }
-                            )
-                        if not created:
-                            # already reserved/sent
-                            continue
-                    except Exception:
-                        # if DB error (race), skip to avoid duplicates
-                        continue
-
+                # Build subject/body
+                subj = f"New episode available: {sub.series_title} S{season:02d}E{number:02d}"
+                body = f"{sub.series_title} S{season:02d}E{number:02d} is now available."
+                # Prefer HTML email rendering if channel falls back to email
+                html = None
                 try:
-                    send_notification_email(
-                    user=sub.user,
-                    media_title=sub.series_title,
-                    media_type='series',
-                    overview=sub.series_overview,
-                    poster_url=ep.get('seriesPoster'),
-                    episode_title=ep.get('title'),
-                    season=season,
-                    episode=number,
-                    air_date=ep.get('airDateUtc'),
-                    )
+                    ctx = {
+                        'username': sub.user.username,
+                        'title': sub.series_title,
+                        'type': 'Serie',
+                        'overview': sub.series_overview,
+                        'poster_url': ep.get('seriesPoster'),
+                        'episode_title': ep.get('title'),
+                        'season': season,
+                        'episode': number,
+                        'air_date': ep.get('airDateUtc'),
+                    }
+                    html = render_to_string('arr_api/email/new_media_notification.html', ctx)
                 except Exception:
-                    # roll back reservation so we can retry next run
-                    if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                        try:
-                            SentNotification.objects.filter(
-                                user=sub.user,
-                                media_id=sub.series_id,
-                                media_type='series',
-                                air_date=today,
-                            ).delete()
-                        except Exception:
-                            pass
-                    continue
-                # no-op: already reserved via get_or_create above
+                    pass
+                _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
+                # mark as sent unless duplicates are allowed
+                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                    SentNotification.objects.create(
+                        user=sub.user,
+                        media_id=sub.series_id,
+                        media_type='series',
+                        media_title=sub.series_title,
+                        air_date=today
+                    )
 
     # Film-Abos
     for sub in MovieSubscription.objects.select_related('user').all():
         it = movie_idx.get(sub.movie_id)
         if not it:
             continue
+
+        if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+            already_notified = SentNotification.objects.filter(
+                media_id=sub.movie_id,
+                media_type='movie',
+                air_date=today,
+                user=sub.user
+            ).exists()
+            if already_notified:
+                continue
 
         if radarr_movie_has_file(sub.movie_id):
             if not sub.user.email:
@@ -329,47 +405,33 @@ def check_and_notify_users():
             except Exception:
                 pass
 
-            # After confirming availability, reserve once per user/movie/day
-            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                try:
-                    with transaction.atomic():
-                        obj, created = SentNotification.objects.get_or_create(
-                            user=sub.user,
-                            media_id=sub.movie_id,
-                            media_type='movie',
-                            air_date=today,
-                            defaults={
-                                'media_title': sub.title,
-                            }
-                        )
-                    if not created:
-                        continue
-                except Exception:
-                    continue
-
+            subj = f"New movie available: {sub.title}"
+            if rel:
+                subj += f" ({rel})"
+            body = f"{sub.title} is now available."
+            html = None
             try:
-                send_notification_email(
-                    user=sub.user,
-                    media_title=sub.title,
-                    media_type='movie',
-                    overview=sub.overview,
-                    poster_url=it.get('posterUrl'),
-                    year=it.get('year'),
-                    release_type=rel,
-                )
+                ctx = {
+                    'username': sub.user.username,
+                    'title': sub.title,
+                    'type': 'Film',
+                    'overview': sub.overview,
+                    'poster_url': it.get('posterUrl'),
+                    'year': it.get('year'),
+                    'release_type': rel,
+                }
+                html = render_to_string('arr_api/email/new_media_notification.html', ctx)
             except Exception:
-                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                    try:
-                        SentNotification.objects.filter(
-                            user=sub.user,
-                            media_id=sub.movie_id,
-                            media_type='movie',
-                            air_date=today,
-                        ).delete()
-                    except Exception:
-                        pass
-                continue
-            # no-op: already reserved via get_or_create above
+                pass
+            _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
+            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                SentNotification.objects.create(
+                    user=sub.user,
+                    media_id=sub.movie_id,
+                    media_type='movie',
+                    media_title=sub.title,
+                    air_date=today
+                )
 
 
 def has_new_episode_today(series_id):

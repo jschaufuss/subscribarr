@@ -14,9 +14,11 @@ class CustomUserChangeForm(UserChangeForm):
     
     class Meta:
         model = User
-        fields = ('email',)
+        fields = ('email', 'notification_channel', 'ntfy_topic', 'apprise_url')
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'text-input', 'placeholder': 'Email address'}),
+            'ntfy_topic': forms.TextInput(attrs={'class': 'text-input', 'placeholder': 'ntfy topic (optional)'}),
+            'apprise_url': forms.Textarea(attrs={'rows': 2, 'placeholder': 'apprise://... or other URL'}),
         }
 
 class JellyfinLoginForm(forms.Form):

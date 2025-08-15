@@ -18,12 +18,25 @@
     {% endif %}
 
     <div class="profile-section">
-    <h3>Email address</h3>
+    <h3>Notifications</h3>
         <form method="post" class="profile-form compact-form">
             {% csrf_token %}
             <div class="form-row">
                 <label for="id_email">Email</label>
                 {{ form.email }}
+            </div>
+            <div class="form-row">
+                <label for="id_notification_channel">Channel</label>
+                {{ form.notification_channel }}
+                <div class="help">Email, ntfy, or Apprise</div>
+            </div>
+            <div class="form-row">
+                <label for="id_ntfy_topic">ntfy topic (optional)</label>
+                {{ form.ntfy_topic }}
+            </div>
+            <div class="form-row">
+                <label for="id_apprise_url">Apprise URL(s)</label>
+                {{ form.apprise_url }}
             </div>
             <button type="submit" class="btn-primary">Save</button>
         </form>

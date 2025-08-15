@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.views import View
 from django.contrib import messages
 from django.utils.decorators import method_decorator
-from .forms import ArrSettingsForm, MailSettingsForm, AccountForm, FirstRunSetupForm, JellyfinSettingsForm
+from .forms import ArrSettingsForm, MailSettingsForm, AccountForm, FirstRunSetupForm, JellyfinSettingsForm, NotificationSettingsForm
 from .models import AppSettings
 from django.http import JsonResponse
 from accounts.utils import jellyfin_admin_required
@@ -96,6 +96,14 @@ class SettingsView(View):
                 "mail_password": cfg.mail_password or "",
                 "mail_from": cfg.mail_from or "",
             }),
+            "notify_form": NotificationSettingsForm(initial={
+                "ntfy_server_url": cfg.ntfy_server_url or "",
+                "ntfy_topic_default": cfg.ntfy_topic_default or "",
+                "ntfy_user": cfg.ntfy_user or "",
+                "ntfy_password": cfg.ntfy_password or "",
+                "ntfy_token": cfg.ntfy_token or "",
+                "apprise_default_url": cfg.apprise_default_url or "",
+            }),
             "account_form": AccountForm(initial={
                 "username": cfg.acc_username or "",
                 "email": cfg.acc_email or "",
@@ -106,13 +114,15 @@ class SettingsView(View):
         jellyfin_form = JellyfinSettingsForm(request.POST)
         arr_form = ArrSettingsForm(request.POST)
         mail_form = MailSettingsForm(request.POST)
+        notify_form = NotificationSettingsForm(request.POST)
         acc_form = AccountForm(request.POST)
 
-        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and acc_form.is_valid()):
+        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and notify_form.is_valid() and acc_form.is_valid()):
             return render(request, self.template_name, {
                 "jellyfin_form": jellyfin_form,
                 "arr_form": arr_form,
                 "mail_form": mail_form,
+                "notify_form": notify_form,
                 "account_form": acc_form,
             })
 
@@ -135,6 +145,14 @@ class SettingsView(View):
         cfg.mail_user     = mail_form.cleaned_data.get("mail_user") or None
         cfg.mail_password = mail_form.cleaned_data.get("mail_password") or None
         cfg.mail_from     = mail_form.cleaned_data.get("mail_from") or None
+
+        # Update Notification settings
+        cfg.ntfy_server_url    = notify_form.cleaned_data.get("ntfy_server_url") or None
+        cfg.ntfy_topic_default = notify_form.cleaned_data.get("ntfy_topic_default") or None
+        cfg.ntfy_user          = notify_form.cleaned_data.get("ntfy_user") or None
+        cfg.ntfy_password      = notify_form.cleaned_data.get("ntfy_password") or None
+        cfg.ntfy_token         = notify_form.cleaned_data.get("ntfy_token") or None
+        cfg.apprise_default_url = notify_form.cleaned_data.get("apprise_default_url") or None
 
         # Update account settings
         cfg.acc_username = acc_form.cleaned_data.get("username") or None

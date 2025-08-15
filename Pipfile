@@ -10,6 +10,7 @@ requests = "*"
 python-dateutil = "*"
 django = "*"
 jellyfin-apiclient-python = "*"
+apprise = "*"
 
 [dev-packages]
 

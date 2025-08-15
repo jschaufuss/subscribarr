@@ -16,6 +16,24 @@ class User(AbstractUser):
     jellyfin_user_id = models.CharField(max_length=100, blank=True, null=True)
     jellyfin_token = models.CharField(max_length=500, blank=True, null=True)
     jellyfin_server = models.CharField(max_length=200, blank=True, null=True)
+
+    # Notifications
+    NOTIFY_EMAIL = 'email'
+    NOTIFY_NTFY = 'ntfy'
+    NOTIFY_APPRISE = 'apprise'
+    NOTIFY_CHOICES = [
+        (NOTIFY_EMAIL, 'Email'),
+        (NOTIFY_NTFY, 'ntfy'),
+        (NOTIFY_APPRISE, 'Apprise'),
+    ]
+    notification_channel = models.CharField(
+        max_length=10,
+        choices=NOTIFY_CHOICES,
+        default=NOTIFY_EMAIL,
+    )
+    # Optional per-user targets/overrides
+    ntfy_topic = models.CharField(max_length=200, blank=True, null=True)
+    apprise_url = models.TextField(blank=True, null=True)
     
     def check_jellyfin_admin(self):
         """Check if user is Jellyfin admin on the server"""

@@ -34,6 +34,16 @@ class AppSettings(models.Model):
     acc_username = models.CharField(max_length=150, blank=True, null=True)
     acc_email = models.EmailField(blank=True, null=True)
 
+    # Notifications - NTFY
+    ntfy_server_url = models.URLField(blank=True, null=True, help_text="Base URL of ntfy server, e.g. https://ntfy.sh")
+    ntfy_topic_default = models.CharField(max_length=200, blank=True, null=True, help_text="Default topic if user hasn't set one")
+    ntfy_user = models.CharField(max_length=255, blank=True, null=True)
+    ntfy_password = models.CharField(max_length=255, blank=True, null=True)
+    ntfy_token = models.CharField(max_length=255, blank=True, null=True, help_text="Bearer token, alternative to user/password")
+
+    # Notifications - Apprise (default target URLs, optional)
+    apprise_default_url = models.TextField(blank=True, null=True, help_text="Apprise URL(s). Multiple allowed, one per line.")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

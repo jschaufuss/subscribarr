@@ -64,6 +64,21 @@ class ArrSettingsForm(forms.Form):
     radarr_api_key = forms.CharField(label="Radarr API Key", required=False,
                                     widget=forms.PasswordInput(render_value=True, attrs=WIDE))
 
+class NotificationSettingsForm(forms.Form):
+    # ntfy
+    ntfy_server_url = forms.URLField(label="ntfy Server URL", required=False, widget=forms.URLInput(attrs=WIDE),
+                                     help_text="e.g., https://ntfy.sh")
+    ntfy_topic_default = forms.CharField(label="Default Topic", required=False, widget=forms.TextInput(attrs=WIDE))
+    ntfy_user = forms.CharField(label="ntfy Username", required=False)
+    ntfy_password = forms.CharField(label="ntfy Password", required=False, widget=forms.PasswordInput(render_value=True))
+    ntfy_token = forms.CharField(label="ntfy Bearer Token", required=False, widget=forms.PasswordInput(render_value=True))
+
+    # Apprise
+    apprise_default_url = forms.CharField(
+        label="Apprise URL(s)", required=False, widget=forms.Textarea(attrs={"rows": 3, "class": "input-wide"}),
+        help_text="One per line. See https://github.com/caronc/apprise/wiki for URL formats."
+    )
+
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)
     mail_port = forms.IntegerField(label="Mail Port", required=False, min_value=1, max_value=65535)
@@ -83,3 +98,23 @@ class AccountForm(forms.Form):
     email = forms.EmailField(label="Email", required=False)
     new_password = forms.CharField(label="New password", required=False, widget=forms.PasswordInput)
     repeat_password = forms.CharField(label="Repeat password", required=False, widget=forms.PasswordInput)
+
+
+class NotificationSettingsForm(forms.Form):
+    # ntfy
+    ntfy_server_url = forms.URLField(label="ntfy Server URL", required=False,
+                                     widget=forms.URLInput(attrs=WIDE),
+                                     help_text="e.g. https://ntfy.sh or your self-hosted URL")
+    ntfy_topic_default = forms.CharField(label="Default topic", required=False,
+                                         widget=forms.TextInput(attrs=WIDE))
+    ntfy_user = forms.CharField(label="ntfy Username", required=False,
+                                widget=forms.TextInput(attrs=WIDE))
+    ntfy_password = forms.CharField(label="ntfy Password", required=False,
+                                    widget=forms.PasswordInput(render_value=True, attrs=WIDE))
+    ntfy_token = forms.CharField(label="ntfy Bearer token", required=False,
+                                 widget=forms.PasswordInput(render_value=True, attrs=WIDE))
+
+    # Apprise
+    apprise_default_url = forms.CharField(label="Apprise URL(s)", required=False,
+                                          widget=forms.Textarea(attrs={"rows": 3, **WIDE}),
+                                          help_text="One URL per line. Will be used in addition to any user-provided URLs.")
