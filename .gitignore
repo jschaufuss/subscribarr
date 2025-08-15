@@ -71,6 +71,10 @@ media/
 # Database
 .data/
 data/
+data/db.sqlite3
+./db.sqlite3
+db.sqlite3
+.db.sqlite3
 
 # Environment files
 .env.local
