@@ -361,9 +361,9 @@ def check_and_notify_users():
                     html = render_to_string('arr_api/email/new_media_notification.html', ctx)
                 except Exception:
                     pass
-                _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
+                ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
                 # mark as sent unless duplicates are allowed
-                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                if ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
                     SentNotification.objects.create(
                         user=sub.user,
                         media_id=sub.series_id,
@@ -423,8 +423,8 @@ def check_and_notify_users():
                 html = render_to_string('arr_api/email/new_media_notification.html', ctx)
             except Exception:
                 pass
-            _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+            ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
+            if ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
                 SentNotification.objects.create(
                     user=sub.user,
                     media_id=sub.movie_id,

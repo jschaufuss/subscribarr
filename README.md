@@ -1,5 +1,139 @@
 # Subscribarr
 
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.13-blue.svg" alt="Python 3.13">
+  <img src="https://img.shields.io/badge/django-5.x-092e20?logo=django&logoColor=white" alt="Django 5">
+  <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker ready">
+  <img src="https://img.shields.io/badge/ntfy-supported-4c1" alt="ntfy supported">
+  <img src="https://img.shields.io/badge/Apprise-supported-4c1" alt="Apprise supported">
+</p>
+
+<!-- Optional dynamic badges (uncomment and replace OWNER/REPO / IMAGE if you want):
+<p align="center">
+  <a href="https://github.com/OWNER/REPO/releases"><img src="https://img.shields.io/github/v/release/OWNER/REPO?sort=semver" alt="latest release"></a>
+  <a href="https://hub.docker.com/r/OWNER/IMAGE"><img src="https://img.shields.io/docker/pulls/OWNER/IMAGE" alt="docker pulls"></a>
+  <a href="https://github.com/OWNER/REPO/commits/main"><img src="https://img.shields.io/github/commit-activity/m/OWNER/REPO" alt="commit activity"></a>
+</p>
+-->
+
+Ein leichtgewichtiges Web‑Frontend für Benachrichtigungen und Abos rund um Sonarr/Radarr – mit Jellyfin‑Login, Kalender, Abo‑Verwaltung und flexiblen Notifications per E‑Mail, ntfy und Apprise.
+
+## Features
+- Jellyfin‑Login (kein eigener Userstore nötig)
+- Kalender im Sonarr/Radarr‑Stil (kommende Episoden/Filme)
+- Abonnieren/Abbestellen direkt aus dem UI (Serien & Filme)
+- Admin‑Übersicht aller Abos je Nutzer inkl. Poster
+- Benachrichtigungen pro Nutzer wählbar:
+  - E‑Mail (SMTP)
+  - ntfy (Token oder Basic Auth)
+  - Apprise (zahlreiche Ziele wie Discord, Gotify, Pushover, Webhooks u. v. m.)
+- Docker‑fertig, env‑gesteuerte Security‑Settings (ALLOWED_HOSTS, CSRF, Proxy)
+
+## Schnellstart
+
+## Screenshots
+<p align="center">
+  <img src="./screenshots/SCR-20250811-lfrm.png" alt="Screenshot 1" width="800"><br/>
+  <img src="./screenshots/SCR-20250811-lfvc.png" alt="Screenshot 2" width="800"><br/>
+  <img src="./screenshots/SCR-20250811-lfod.png" alt="Screenshot 3" width="800"><br/>
+  <img src="./screenshots/SCR-20250811-lfyq.png" alt="Screenshot 4" width="800"><br/>
+  <img src="./screenshots/SCR-20250811-lgau.png" alt="Screenshot 5" width="800"><br/>
+  <img src="./screenshots/SCR-20250811-lgcz.png" alt="Screenshot 6" width="800">
+</p>
+
+### Mit Docker Compose
+1) Lockfile aktuell halten (wenn `Pipfile` geändert wurde):
+```bash
+pipenv lock
+```
+2) Image bauen/Starten:
+```bash
+docker compose build
+docker compose up -d
+```
+3) Öffne die App und führe das First‑Run‑Setup (Jellyfin + Arr‑URLs/Keys) durch.
+
+Wichtige Umgebungsvariablen (Beispiele):
+- `DJANGO_ALLOWED_HOSTS=subscribarr.example.com,localhost,127.0.0.1`
+- `DJANGO_CSRF_TRUSTED_ORIGINS=https://subscribarr.example.com,http://subscribarr.example.com`
+- Reverse‑Proxy/TLS:
+  - `USE_X_FORWARDED_HOST=true`
+  - `DJANGO_SECURE_PROXY_SSL_HEADER=true`
+  - `DJANGO_CSRF_COOKIE_SECURE=true`
+  - `DJANGO_SESSION_COOKIE_SECURE=true`
+
+> Hinweis: In `DJANGO_CSRF_TRUSTED_ORIGINS` muss Schema+Host (und ggf. Port) exakt stimmen.
+
+### Lokal (Pipenv)
+```bash
+pipenv sync
+pipenv run python manage.py migrate
+pipenv run python manage.py runserver
+```
+
+## Konfiguration im UI
+- Einstellungen → Jellyfin: Server‑URL + API‑Key
+- Einstellungen → Sonarr/Radarr: Base‑URLs + API‑Keys (inkl. „Test“-Knopf)
+- Einstellungen → Mailserver: SMTP (Host/Port/TLS/SSL/Benutzer/Passwort/From)
+- Einstellungen → Notifications:
+  - ntfy: Server‑URL, Default‑Topic, Basic‑Auth oder Bearer‑Token
+  - Apprise: Default‑URL(s) (eine pro Zeile)
+- Profil (pro Nutzer):
+  - Kanal wählen: E‑Mail, ntfy oder Apprise
+  - ntfy Topic (optional, überschreibt Default)
+  - Apprise URL(s) (optional, ergänzen die Defaults)
+
+## ntfy – Hinweise
+- Server‑URL: z. B. `https://ntfy.sh` oder eigener Server
+- Auth:
+  - Bearer‑Token (Header)
+  - Basic‑Auth (Benutzer/Passwort)
+- Topic:
+  - pro Nutzer frei wählbar (Profil) oder globales Default‑Topic (Einstellungen)
+
+## Apprise – Hinweise
+- Trag eine oder mehrere Ziel‑URLs ein (pro Zeile), z. B.:
+  - `gotify://TOKEN@gotify.example.com/`  
+  - `discord://webhook_id/webhook_token`  
+  - `mailto://user:pass@smtp.example.com`  
+  - `pover://user@token`  
+  - `json://webhook.example.com/path`
+- Nutzer können eigene URLs ergänzen; die globalen Defaults bleiben zusätzlich aktiv.
+
+## Benachrichtigungslogik
+- Serien: Es wird pro Abo am Release‑Tag geprüft, ob die Episode bereits als Datei vorhanden ist (Sonarr `hasFile`).
+- Filme: Analog über Radarr `hasFile` und Release‑Datum (Digital/Disc/Kino‐Tag).
+- Doppelversand wird per `SentNotification` unterdrückt (täglich pro Item/Nutzer).
+- Fallback: Wenn ntfy/Apprise scheitern, wird E‑Mail versendet (falls konfiguriert).
+
+## Jobs / Manuell anstoßen
+- Regelmäßiger Check per Management Command (z. B. via Cron):
+```bash
+pipenv run python manage.py check_new_media
+```
+- In Docker:
+```bash
+docker compose exec web python manage.py check_new_media
+```
+
+## Sicherheit & Proxy
+- Setze `DJANGO_ALLOWED_HOSTS` auf deine(n) Hostnamen.
+- Füge alle genutzten Ursprünge in `DJANGO_CSRF_TRUSTED_ORIGINS` hinzu (http/https und Port beachten).
+- Hinter Reverse‑Proxy TLS aktivieren: `USE_X_FORWARDED_HOST`, `DJANGO_SECURE_PROXY_SSL_HEADER`, Cookie‑Flags.
+
+## Tech‑Stack
+- Backend: Django 5 + DRF
+- Integrationen: Sonarr/Radarr (API v3)
+- Auth: Jellyfin
+- Notifications: SMTP, ntfy (HTTP), Apprise
+- Frontend: Templates + FullCalendar
+- DB: SQLite (default)
+
+## Lizenz
+MIT
+# Subscribarr
+
 # Subscribarr
 
 Subscribarr is a notification tool for the *Arr ecosystem (Sonarr, Radarr) and Jellyfin. Users can subscribe to shows/movies; when new episodes/releases are available (and actually present), Subscribarr sends email notifications.

@@ -69,7 +69,8 @@ staticfiles/
 media/
 
 # Database
-/db.sqlite3
+.data/
+data/
 
 # Environment files
 .env.local
