@@ -4,7 +4,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
   <img src="https://img.shields.io/badge/python-3.13-blue.svg" alt="Python 3.13">
   <img src="https://img.shields.io/badge/django-5.x-092e20?logo=django&logoColor=white" alt="Django 5">
-  <img src="https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker ready">
+  <a href="https://hub.docker.com/r/10010011/subscribarr"><img src="https://img.shields.io/docker/pulls/10010011/subscribarr" alt="docker pulls"></a>
   <img src="https://img.shields.io/badge/ntfy-supported-4c1" alt="ntfy supported">
   <img src="https://img.shields.io/badge/Apprise-supported-4c1" alt="Apprise supported">
 </p>
