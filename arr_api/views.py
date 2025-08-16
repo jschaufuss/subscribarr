@@ -81,9 +81,13 @@ class ArrIndexView(View):
             eps = [e for e in eps if q in (e.get("seriesTitle") or "").lower()]
             movies = [m for m in movies if q in (m.get("title") or "").lower()]
 
-        # Abonnierte Serien und Filme laden
-        subscribed_series_ids = set(SeriesSubscription.objects.values_list('series_id', flat=True))
-        subscribed_movie_ids = set(MovieSubscription.objects.values_list('movie_id', flat=True))
+        # Abonnierte Serien und Filme pro aktuellem Nutzer
+        if request.user.is_authenticated:
+            subscribed_series_ids = set(SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True))
+            subscribed_movie_ids = set(MovieSubscription.objects.filter(user=request.user).values_list('movie_id', flat=True))
+        else:
+            subscribed_series_ids = set()
+            subscribed_movie_ids = set()
 
         # Gruppierung nach Serie
         groups = defaultdict(lambda: {
@@ -197,70 +201,7 @@ class CalendarEventsApi(APIView):
         return Response({"events": events})
 
 
-class SubscribeSeriesView(View):
-    @method_decorator(require_POST)
-    def post(self, request, series_id):
-        series_data = {
-            'series_id': series_id,
-            'series_title': request.POST.get('series_title'),
-            'series_poster': request.POST.get('series_poster'),
-            'series_overview': request.POST.get('series_overview'),
-            'series_genres': request.POST.getlist('series_genres[]', [])
-        }
-        
-        subscription, created = SeriesSubscription.objects.get_or_create(
-            series_id=series_id,
-            defaults=series_data
-        )
-        
-        if created:
-            messages.success(request, f'Subscribed to series "{series_data["series_title"]}"!')
-        else:
-            messages.info(request, f'Series "{series_data["series_title"]}" was already subscribed.')
-            
-        return redirect('arr_api:index')
-
-class UnsubscribeSeriesView(View):
-    @method_decorator(require_POST)
-    def post(self, request, series_id):
-        subscription = get_object_or_404(SeriesSubscription, series_id=series_id)
-        series_title = subscription.series_title
-        subscription.delete()
-        messages.success(request, f'Subscription for "{series_title}" has been removed.')
-        return redirect('arr_api:index')
-
-class SubscribeMovieView(View):
-    @method_decorator(require_POST)
-    def post(self, request, movie_id):
-        movie_data = {
-            'movie_id': movie_id,
-            'title': request.POST.get('title'),
-            'poster': request.POST.get('poster'),
-            'overview': request.POST.get('overview'),
-            'genres': request.POST.getlist('genres[]', []),
-            'release_date': request.POST.get('release_date')
-        }
-        
-        subscription, created = MovieSubscription.objects.get_or_create(
-            movie_id=movie_id,
-            defaults=movie_data
-        )
-        
-        if created:
-            messages.success(request, f'Subscribed to movie "{movie_data["title"]}"!')
-        else:
-            messages.info(request, f'Movie "{movie_data["title"]}" was already subscribed.')
-            
-        return redirect('arr_api:index')
-
-class UnsubscribeMovieView(View):
-    @method_decorator(require_POST)
-    def post(self, request, movie_id):
-        subscription = get_object_or_404(MovieSubscription, movie_id=movie_id)
-        movie_title = subscription.title
-        subscription.delete()
-        messages.success(request, f'Subscription for "{movie_title}" has been removed.')
-        return redirect('arr_api:index')
+ 
 
 
 @require_POST

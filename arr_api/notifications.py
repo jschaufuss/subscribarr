@@ -7,6 +7,7 @@ from settingspanel.models import AppSettings
 import requests
 from dateutil.parser import isoparse
 import logging
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,8 @@ def _dispatch_user_notification(user, subject: str, body_text: str, html_message
             return True
         # fallback to email
     try:
+        # Ensure email backend is configured from AppSettings at runtime
+        _set_runtime_email_settings()
         send_mail(
             subject=subject,
             message=body_text,
@@ -326,21 +329,10 @@ def check_and_notify_users():
             if season is None or number is None:
                 continue
 
-            # duplicate guard (per series per day per user)
-            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                already_notified = SentNotification.objects.filter(
-                    media_id=sub.series_id,
-                    media_type='series',
-                    air_date=today,
-                    user=sub.user
-                ).exists()
-                if already_notified:
-                    continue
+            # duplicate guard will be handled atomically before dispatch
 
             # check availability via Sonarr hasFile
             if sonarr_episode_has_file(sub.series_id, season, number):
-                if not sub.user.email:
-                    continue
                 # Build subject/body
                 subj = f"New episode available: {sub.series_title} S{season:02d}E{number:02d}"
                 body = f"{sub.series_title} S{season:02d}E{number:02d} is now available."
@@ -361,36 +353,48 @@ def check_and_notify_users():
                     html = render_to_string('arr_api/email/new_media_notification.html', ctx)
                 except Exception:
                     pass
+                # Reserve duplicate token atomically, then dispatch; rollback on failure
+                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                    try:
+                        with transaction.atomic():
+                            token, created = SentNotification.objects.get_or_create(
+                                user=sub.user,
+                                media_id=sub.series_id,
+                                media_type='series',
+                                air_date=today,
+                                defaults={'media_title': sub.series_title}
+                            )
+                        if not created:
+                            continue
+                    except Exception:
+                        # race or DB error -> skip to avoid duplicates
+                        continue
                 ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-                # mark as sent unless duplicates are allowed
-                if ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                    SentNotification.objects.create(
-                        user=sub.user,
-                        media_id=sub.series_id,
-                        media_type='series',
-                        media_title=sub.series_title,
-                        air_date=today
-                    )
+                if not ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                    # allow retry on next run
+                    try:
+                        SentNotification.objects.filter(
+                            user=sub.user,
+                            media_id=sub.series_id,
+                            media_type='series',
+                            air_date=today
+                        ).delete()
+                    except Exception:
+                        pass
 
     # Film-Abos
     for sub in MovieSubscription.objects.select_related('user').all():
         it = movie_idx.get(sub.movie_id)
+        # Fallback: if movie_id missing, try match by title
+        if not it and getattr(sub, 'title', None):
+            for _mid, _it in movie_idx.items():
+                if (_it.get('title') or '').strip().lower() == (sub.title or '').strip().lower():
+                    it = _it
+                    break
         if not it:
             continue
 
-        if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-            already_notified = SentNotification.objects.filter(
-                media_id=sub.movie_id,
-                media_type='movie',
-                air_date=today,
-                user=sub.user
-            ).exists()
-            if already_notified:
-                continue
-
         if radarr_movie_has_file(sub.movie_id):
-            if not sub.user.email:
-                continue
             # detect which release matched today
             rel = None
             try:
@@ -423,15 +427,32 @@ def check_and_notify_users():
                 html = render_to_string('arr_api/email/new_media_notification.html', ctx)
             except Exception:
                 pass
+            # Reserve duplicate token atomically, then dispatch; rollback on failure
+            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                try:
+                    with transaction.atomic():
+                        token, created = SentNotification.objects.get_or_create(
+                            user=sub.user,
+                            media_id=sub.movie_id,
+                            media_type='movie',
+                            air_date=today,
+                            defaults={'media_title': sub.title}
+                        )
+                    if not created:
+                        continue
+                except Exception:
+                    continue
             ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-            if ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                SentNotification.objects.create(
-                    user=sub.user,
-                    media_id=sub.movie_id,
-                    media_type='movie',
-                    media_title=sub.title,
-                    air_date=today
-                )
+            if not ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                try:
+                    SentNotification.objects.filter(
+                        user=sub.user,
+                        media_id=sub.movie_id,
+                        media_type='movie',
+                        air_date=today
+                    ).delete()
+                except Exception:
+                    pass
 
 
 def has_new_episode_today(series_id):
