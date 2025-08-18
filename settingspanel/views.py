@@ -2,11 +2,16 @@ from django.shortcuts import render, redirect
 from django.views import View
 from django.contrib import messages
 from django.utils.decorators import method_decorator
-from .forms import ArrSettingsForm, MailSettingsForm, AccountForm, FirstRunSetupForm, JellyfinSettingsForm, NotificationSettingsForm
+from .forms import (
+    ArrSettingsForm,
+    MailSettingsForm,
+    FirstRunSetupForm,
+    JellyfinSettingsForm,
+    NotificationSettingsForm,
+)
 from .models import AppSettings
 from django.http import JsonResponse
 from accounts.utils import jellyfin_admin_required
-from django.contrib.auth import get_user_model
 from arr_api.models import SeriesSubscription, MovieSubscription
 from django.db.models import Count
 import requests
@@ -40,14 +45,7 @@ def first_run(request):
         form = FirstRunSetupForm()
     
     return render(request, 'settingspanel/first_run.html', {'form': form})
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.utils.decorators import method_decorator
-from .forms import ArrSettingsForm, MailSettingsForm, AccountForm, JellyfinSettingsForm
-from .models import AppSettings
-from django.http import JsonResponse
-from accounts.utils import jellyfin_admin_required
-import requests
+
 
 @jellyfin_admin_required
 def test_connection(request):
@@ -104,10 +102,6 @@ class SettingsView(View):
                 "ntfy_token": cfg.ntfy_token or "",
                 "apprise_default_url": cfg.apprise_default_url or "",
             }),
-            "account_form": AccountForm(initial={
-                "username": cfg.acc_username or "",
-                "email": cfg.acc_email or "",
-            }),
         })
 
     def post(self, request):
@@ -115,16 +109,17 @@ class SettingsView(View):
         arr_form = ArrSettingsForm(request.POST)
         mail_form = MailSettingsForm(request.POST)
         notify_form = NotificationSettingsForm(request.POST)
-        acc_form = AccountForm(request.POST)
-
-        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and notify_form.is_valid() and acc_form.is_valid()):
-            return render(request, self.template_name, {
-                "jellyfin_form": jellyfin_form,
-                "arr_form": arr_form,
-                "mail_form": mail_form,
-                "notify_form": notify_form,
-                "account_form": acc_form,
-            })
+        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and notify_form.is_valid()):
+            return render(
+                request,
+                self.template_name,
+                {
+                    "jellyfin_form": jellyfin_form,
+                    "arr_form": arr_form,
+                    "mail_form": mail_form,
+                    "notify_form": notify_form,
+                },
+            )
 
         cfg = AppSettings.current()
 
@@ -153,10 +148,6 @@ class SettingsView(View):
         cfg.ntfy_password      = notify_form.cleaned_data.get("ntfy_password") or None
         cfg.ntfy_token         = notify_form.cleaned_data.get("ntfy_token") or None
         cfg.apprise_default_url = notify_form.cleaned_data.get("apprise_default_url") or None
-
-        # Update account settings
-        cfg.acc_username = acc_form.cleaned_data.get("username") or None
-        cfg.acc_email    = acc_form.cleaned_data.get("email") or None
 
         cfg.save()
         messages.success(request, "Settings saved (DB).")

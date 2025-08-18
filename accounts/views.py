@@ -6,19 +6,11 @@ from django.views.generic.edit import CreateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import login
 from django.conf import settings
-from .forms import CustomUserCreationForm, CustomUserChangeForm, JellyfinLoginForm
+from .forms import CustomUserChangeForm, JellyfinLoginForm
 from .models import User
 from .utils import JellyfinClient
 
-class RegisterView(CreateView):
-    form_class = CustomUserCreationForm
-    template_name = 'accounts/register.html'
-    success_url = reverse_lazy('accounts:login')
-    
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, 'Registration successful! You can now sign in.')
-        return response
+# Registration is disabled: Jellyfin SSO only.
 
 @login_required
 def profile(request):

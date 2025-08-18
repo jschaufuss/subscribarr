@@ -8,8 +8,6 @@
         {{ form.as_p }}
     <button type="submit" class="btn-primary">Sign in</button>
     </form>
-    <div class="auth-links">
-    <p>Don't have an account? <a href="{% url 'accounts:register' %}">Register now</a></p>
-    </div>
+    <!-- Local registration disabled: Jellyfin-only login -->
 </div>
 {% endblock %}

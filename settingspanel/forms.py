@@ -93,11 +93,7 @@ class MailSettingsForm(forms.Form):
     )
     mail_from = forms.EmailField(label="Sender (From)", required=False)
 
-class AccountForm(forms.Form):
-    username = forms.CharField(label="Username", required=False)
-    email = forms.EmailField(label="Email", required=False)
-    new_password = forms.CharField(label="New password", required=False, widget=forms.PasswordInput)
-    repeat_password = forms.CharField(label="Repeat password", required=False, widget=forms.PasswordInput)
+# Account form removed: local account management disabled
 
 
 class NotificationSettingsForm(forms.Form):
