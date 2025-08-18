@@ -8,7 +8,7 @@
 {% block content %}
 <div class="setup-container">
     <h1>Welcome to Subscribarr</h1>
-    <p class="setup-intro">Let's set up your installation. You need at least one Jellyfin server.</p>
+    <p class="setup-intro">Let's set up your installation. You need at least one Jellyfin server. Additional Sonarr/Radarr instances can be added later in Administration → Settings.</p>
 
     <form method="post" class="setup-form">
         {% csrf_token %}
@@ -29,6 +29,7 @@
 
         <div class="setup-section">
             <h2>Sonarr (optional)</h2>
+            <p class="help">Note: You can add more instances later in the admin settings.</p>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.sonarr_url }}
@@ -41,6 +42,7 @@
 
         <div class="setup-section">
             <h2>Radarr (optional)</h2>
+            <p class="help">Note: You can add more instances later in the admin settings.</p>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.radarr_url }}

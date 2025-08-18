@@ -8,8 +8,9 @@ from .forms import (
     FirstRunSetupForm,
     JellyfinSettingsForm,
     NotificationSettingsForm,
+    ArrInstanceFormSet,
 )
-from .models import AppSettings
+from .models import AppSettings, ArrInstance
 from django.http import JsonResponse
 from accounts.utils import jellyfin_admin_required
 from arr_api.models import SeriesSubscription, MovieSubscription
@@ -38,6 +39,34 @@ def first_run(request):
             settings.radarr_url = form.cleaned_data['radarr_url']
             settings.radarr_api_key = form.cleaned_data['radarr_api_key']
             settings.save()
+
+            # Create initial ArrInstance rows so they appear in admin settings
+            try:
+                if settings.sonarr_url and settings.sonarr_api_key:
+                    ArrInstance.objects.get_or_create(
+                        kind="sonarr",
+                        name="Default",
+                        defaults={
+                            "base_url": settings.sonarr_url,
+                            "api_key": settings.sonarr_api_key,
+                            "enabled": True,
+                            "order": 0,
+                        }
+                    )
+                if settings.radarr_url and settings.radarr_api_key:
+                    ArrInstance.objects.get_or_create(
+                        kind="radarr",
+                        name="Default",
+                        defaults={
+                            "base_url": settings.radarr_url,
+                            "api_key": settings.radarr_api_key,
+                            "enabled": True,
+                            "order": 0,
+                        }
+                    )
+            except Exception:
+                # Non-fatal if creation fails; user can add later in settings
+                pass
             
             messages.success(request, 'Setup completed successfully!')
             return redirect('accounts:login')
@@ -75,6 +104,38 @@ class SettingsView(View):
 
     def get(self, request):
         cfg = AppSettings.current()
+        # If no ArrInstance rows exist yet, but legacy fields are present, seed them once
+        try:
+            if not ArrInstance.objects.exists():
+                created_any = False
+                if cfg.sonarr_url and cfg.sonarr_api_key:
+                    ArrInstance.objects.get_or_create(
+                        kind="sonarr",
+                        name="Default",
+                        defaults={
+                            "base_url": cfg.sonarr_url,
+                            "api_key": cfg.sonarr_api_key,
+                            "enabled": True,
+                            "order": 0,
+                        },
+                    )
+                    created_any = True
+                if cfg.radarr_url and cfg.radarr_api_key:
+                    ArrInstance.objects.get_or_create(
+                        kind="radarr",
+                        name="Default",
+                        defaults={
+                            "base_url": cfg.radarr_url,
+                            "api_key": cfg.radarr_api_key,
+                            "enabled": True,
+                            "order": 0,
+                        },
+                    )
+                    created_any = True
+                if created_any:
+                    messages.info(request, "Imported legacy Sonarr/Radarr settings as instances.")
+        except Exception:
+            pass
         return render(request, self.template_name, {
             "jellyfin_form": JellyfinSettingsForm(initial={
                 "jellyfin_server_url": cfg.jellyfin_server_url or "",
@@ -86,6 +147,7 @@ class SettingsView(View):
                 "radarr_url": cfg.radarr_url or "",
                 "radarr_api_key": cfg.radarr_api_key or "",
             }),
+            "arr_instances": ArrInstanceFormSet(queryset=ArrInstance.objects.all().order_by("order", "id")),
             "mail_form": MailSettingsForm(initial={
                 "mail_host": cfg.mail_host or "",
                 "mail_port": cfg.mail_port or "",
@@ -109,7 +171,8 @@ class SettingsView(View):
         arr_form = ArrSettingsForm(request.POST)
         mail_form = MailSettingsForm(request.POST)
         notify_form = NotificationSettingsForm(request.POST)
-        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and notify_form.is_valid()):
+        inst_formset = ArrInstanceFormSet(request.POST, queryset=ArrInstance.objects.all().order_by("order", "id"))
+        if not (jellyfin_form.is_valid() and arr_form.is_valid() and mail_form.is_valid() and notify_form.is_valid() and inst_formset.is_valid()):
             return render(
                 request,
                 self.template_name,
@@ -118,6 +181,7 @@ class SettingsView(View):
                     "arr_form": arr_form,
                     "mail_form": mail_form,
                     "notify_form": notify_form,
+                    "arr_instances": inst_formset,
                 },
             )
 
@@ -150,6 +214,14 @@ class SettingsView(View):
         cfg.apprise_default_url = notify_form.cleaned_data.get("apprise_default_url") or None
 
         cfg.save()
+        # Save instances with minor normalization
+        objs = inst_formset.save(commit=False)
+        for obj in objs:
+            if obj.base_url:
+                obj.base_url = obj.base_url.strip().rstrip('/')
+            obj.save()
+        for obj in inst_formset.deleted_objects:
+            obj.delete()
         messages.success(request, "Settings saved (DB).")
         return redirect("settingspanel:index")
 

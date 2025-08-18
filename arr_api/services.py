@@ -18,7 +18,12 @@ def _get(url, headers, params=None, timeout=5):
     try:
         r = requests.get(url, headers=headers, params=params or {}, timeout=timeout)
         r.raise_for_status()
-        return r.json()
+        try:
+            return r.json()
+        except ValueError as ve:
+            # Return first 120 chars of body to help debug wrong URL or auth
+            snippet = (r.text or "")[:120].replace("\n", " ")
+            raise ArrServiceError(f"Invalid JSON from {url} — check base URL and API key. Body: {snippet}") from ve
     except requests.exceptions.RequestException as e:
         raise ArrServiceError(str(e))
 

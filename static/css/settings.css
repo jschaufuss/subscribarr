@@ -140,7 +140,7 @@ a {
     align-items: center;
     gap: 8px;
     min-width: 220px;
-    justify-content: flex-end
+    justify-content: flex-start
 }
 
 .btn:disabled {
@@ -176,3 +176,19 @@ a {
 .badge.muted {
     opacity: .8
 }
+
+.arr-row {
+    border: 1px solid var(--panel-b);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 10px 0;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.arr-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; padding:6px 4px; }
+.arr-title { display:flex; align-items:center; gap:8px; }
+.arr-body { margin-top:10px; }
+.arr-row.collapsed .arr-body { display:none; }
+.arr-row .arr-chevron { transform: rotate(0deg); transition: transform .15s ease; }
+.arr-row.collapsed .arr-chevron { transform: rotate(-90deg); }
+.badge.small { font-size: .75rem; padding: 2px 8px; }

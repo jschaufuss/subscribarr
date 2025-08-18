@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from settingspanel.models import AppSettings
+from settingspanel.models import AppSettings, ArrInstance
 from .services import sonarr_calendar, radarr_calendar, ArrServiceError
 from .models import SeriesSubscription, MovieSubscription
 from django.utils import timezone
@@ -23,14 +23,18 @@ def _get_int(request, key, default):
     except (TypeError, ValueError):
         return default
 
-def _arr_conf_from_db():
+def _arr_instances():
+    inst = list(ArrInstance.objects.filter(enabled=True).order_by("order", "id"))
+    if inst:
+        return inst
+    # Fallback to legacy single-instance fields for backward compatibility
     cfg = AppSettings.current()
-    return {
-        "sonarr_url": cfg.sonarr_url,
-        "sonarr_key": cfg.sonarr_api_key,
-        "radarr_url": cfg.radarr_url,
-        "radarr_key": cfg.radarr_api_key,
-    }
+    fallback = []
+    if cfg.sonarr_url and cfg.sonarr_api_key:
+        fallback.append(ArrInstance(kind="sonarr", name="Default", base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key))
+    if cfg.radarr_url and cfg.radarr_api_key:
+        fallback.append(ArrInstance(kind="radarr", name="Default", base_url=cfg.radarr_url, api_key=cfg.radarr_api_key))
+    return fallback
 
 
 #class SonarrAiringView(APIView):
@@ -62,20 +66,18 @@ class ArrIndexView(View):
         kind = (request.GET.get("kind") or "all").lower()
         days = _get_int(request, "days", 30)
 
-        conf = _arr_conf_from_db()
-
         eps, movies = [], []
-        # Sonarr robust laden
-        try:
-            eps = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
-        except ArrServiceError as e:
-            messages.error(request, f"Sonarr is not reachable: {e}")
-
-        # Radarr robust laden
-        try:
-            movies = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
-        except ArrServiceError as e:
-            messages.error(request, f"Radarr is not reachable: {e}")
+        for inst in _arr_instances():
+            if inst.kind == "sonarr":
+                try:
+                    eps.extend(sonarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
+                except ArrServiceError as e:
+                    messages.error(request, f"Sonarr ({inst.name}) is not reachable: {e}")
+            elif inst.kind == "radarr":
+                try:
+                    movies.extend(radarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
+                except ArrServiceError as e:
+                    messages.error(request, f"Radarr ({inst.name}) is not reachable: {e}")
 
         # Suche
         if q:
@@ -145,15 +147,18 @@ class CalendarView(View):
 class CalendarEventsApi(APIView):
     def get(self, request):
         days = _get_int(request, "days", 60)
-        conf = _arr_conf_from_db()
-        try:
-            eps = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
-        except ArrServiceError:
-            eps = []
-        try:
-            movies = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
-        except ArrServiceError:
-            movies = []
+        eps, movies = [], []
+        for inst in _arr_instances():
+            if inst.kind == "sonarr":
+                try:
+                    eps.extend(sonarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
+                except ArrServiceError:
+                    pass
+            elif inst.kind == "radarr":
+                try:
+                    movies.extend(radarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
+                except ArrServiceError:
+                    pass
 
         series_sub = set(SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True))
         movie_sub_titles = set(MovieSubscription.objects.filter(user=request.user).values_list('title', flat=True))
