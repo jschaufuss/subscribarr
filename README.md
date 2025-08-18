@@ -1,4 +1,6 @@
-# Subscribarr
+<p align="center">
+  <img src="./static/images/logo.png" alt="Subscribarr" width="450" height="150" />
+</p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>

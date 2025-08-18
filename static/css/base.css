@@ -5,6 +5,9 @@
     --accent: #3b82f6;
     --muted: #9aa0b4;
     --text: #e6e6e6;
+    /* Logo dimensions: increase width for a bigger look without taller navbar */
+    --brand-logo-height: 50px;
+    --brand-logo-width: 150px;
 }
 
 body {
@@ -14,7 +17,6 @@ body {
     margin: 0;
     line-height: 1.5;
 }
-
 .auth-container {
     max-width: 420px;
     margin: 64px auto;
@@ -120,6 +122,24 @@ body {
     text-decoration: none;
     font-weight: 600;
     font-size: 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-logo {
+    height: var(--brand-logo-height);
+    width: var(--brand-logo-width);
+    border-radius: 4px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+@media (max-width: 520px) {
+    :root {
+        --brand-logo-height: 36px;
+        --brand-logo-width: 130px;
+    }
 }
 
 .nav-links {

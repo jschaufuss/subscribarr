@@ -109,6 +109,12 @@
                     <div class="row"><label>User</label>{{ mail_form.mail_user }}</div>
                     <div class="row"><label>Password</label>{{ mail_form.mail_password }}</div>
                     <div class="row"><label>From</label>{{ mail_form.mail_from }}</div>
+                    <div class="row">
+                        <label>Test email</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('email', this)">Send test email</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -119,10 +125,34 @@
                     <div class="row"><label>Username</label>{{ notify_form.ntfy_user }}</div>
                     <div class="row"><label>Password</label>{{ notify_form.ntfy_password }}</div>
                     <div class="row"><label>Bearer token</label>{{ notify_form.ntfy_token }}</div>
+                    <div class="row">
+                        <label>Test ntfy</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('ntfy', this)">Send test ntfy</button>
+                        </div>
+                    </div>
 
                     <h3 style="margin-top:12px;">Apprise</h3>
                     <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
                     <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
+                    <div class="row">
+                        <label>Test Apprise</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('apprise', this)">Send test apprise</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="border-color:#6f1f2a;">
+                    <h2>Destructive actions</h2>
+                    <div class="help">Danger zone: these actions delete today's notification tokens so events can be re-sent during testing.</div>
+                    <div class="row">
+                        <label>Reset tokens</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="resetNotify('me', this)">Clear my tokens (today)</button>
+                            <button class="btn" type="button" onclick="resetNotify('all', this)">Clear all tokens (today)</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Account management removed: Jellyfin-only auth -->
@@ -305,6 +335,30 @@
             else alert(kind + ' error: ' + (data.error || 'Unknown error') + '\nCheck base URL (http(s)://host:port) and API key.');
                 })
                 .catch(err=>alert(kind + ' error: ' + String(err)));
+        }
+
+        function testNotify(channel, btn){
+            if(btn) btn.disabled = true;
+            fetch(`/settings/test-notify/?channel=${encodeURIComponent(channel)}`)
+                .then(r=>r.json())
+                .then(data=>{
+                    if(data.ok) alert(`Test ${channel} sent.`);
+                    else alert(`Test ${channel} failed: ${data.error||'Unknown error'}`);
+                })
+                .catch(err=>alert(`Test ${channel} error: ${String(err)}`))
+                .finally(()=>{ if(btn) btn.disabled=false; });
+        }
+
+        function resetNotify(scope, btn){
+            if(btn) btn.disabled = true;
+            fetch(`/settings/reset-notify-tokens/?scope=${encodeURIComponent(scope)}`)
+                .then(r=>r.json())
+                .then(data=>{
+                    if(data.ok) alert(`Cleared ${data.deleted||0} token(s).`);
+                    else alert(`Reset failed: ${data.error||'Unknown error'}`);
+                })
+                .catch(err=>alert(`Reset error: ${String(err)}`))
+                .finally(()=>{ if(btn) btn.disabled=false; });
         }
 
     </script>

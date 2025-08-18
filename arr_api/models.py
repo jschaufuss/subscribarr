@@ -44,6 +44,7 @@ class SentNotification(models.Model):
     sent_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        # We dedupe per user + media (episodeId/movieId) + type + date
         unique_together = ['user', 'media_id', 'media_type', 'air_date']
         ordering = ['-sent_at']
 

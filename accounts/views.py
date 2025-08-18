@@ -29,13 +29,39 @@ def profile(request):
 
     # Best-effort Backfill fehlender Poster, damit die Profilseite Bilder zeigt
     try:
-        from settingspanel.models import AppSettings
+        from settingspanel.models import AppSettings, ArrInstance
         from arr_api.services import sonarr_get_series, radarr_lookup_movie_by_title
         cfg = AppSettings.current()
+        # choose any enabled instance if legacy fields are not set
+        sonarr_conf = None
+        radarr_conf = None
+        try:
+            if cfg.sonarr_url and cfg.sonarr_api_key:
+                sonarr_conf = (cfg.sonarr_url, cfg.sonarr_api_key)
+            else:
+                inst = ArrInstance.objects.filter(enabled=True, kind='sonarr').order_by('order','id').first()
+                if inst:
+                    sonarr_conf = (inst.base_url, inst.api_key)
+        except Exception:
+            sonarr_conf = None
+        try:
+            if cfg.radarr_url and cfg.radarr_api_key:
+                radarr_conf = (cfg.radarr_url, cfg.radarr_api_key)
+            else:
+                inst = ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order','id').first()
+                if inst:
+                    radarr_conf = (inst.base_url, inst.api_key)
+        except Exception:
+            radarr_conf = None
     # Series
         for sub in series_subs:
             if not sub.series_poster and sub.series_id:
-                details = sonarr_get_series(sub.series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
+                details = None
+                try:
+                    if sonarr_conf:
+                        details = sonarr_get_series(sub.series_id, base_url=sonarr_conf[0], api_key=sonarr_conf[1])
+                except Exception:
+                    details = None
                 if details and details.get('series_poster'):
                     sub.series_poster = details['series_poster']
                     if not sub.series_overview:
@@ -46,7 +72,12 @@ def profile(request):
     # Movies
         for sub in movie_subs:
             if not sub.poster:
-                details = radarr_lookup_movie_by_title(sub.title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
+                details = None
+                try:
+                    if radarr_conf:
+                        details = radarr_lookup_movie_by_title(sub.title, base_url=radarr_conf[0], api_key=radarr_conf[1])
+                except Exception:
+                    details = None
                 if details and details.get('poster'):
                     sub.poster = details['poster']
                     if not sub.overview:

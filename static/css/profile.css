@@ -132,16 +132,23 @@
 
 .compact-form .form-row {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 140px minmax(0, 1fr);
     gap: 10px;
     align-items: center;
     margin-bottom: 10px
 }
 
-.text-input {
+.compact-form .form-row .help { grid-column: 2 / 3; }
+
+.text-input,
+.profile-form input,
+.profile-form select,
+.profile-form textarea {
+    box-sizing: border-box;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    display: block;
     padding: 10px 12px;
     border-radius: 10px;
     border: 1px solid #2a2a34;
@@ -152,4 +159,10 @@
 .text-input:focus {
     border-color: var(--accent);
     outline: none
+}
+
+@media (max-width: 520px) {
+    .compact-form .form-row { grid-template-columns: 1fr; }
+    .compact-form .form-row label { margin-bottom: 6px; }
+    .compact-form .form-row .help { grid-column: 1 / 2; }
 }

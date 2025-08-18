@@ -313,10 +313,21 @@ def get_subscriptions(request):
 class SeriesSubscribeView(APIView):
     def post(self, request, series_id):
         from .services import sonarr_get_series
-        cfg = AppSettings.current()
+        # Try enabled Sonarr instances first, fallback to legacy single instance
         details = None
         try:
-            details = sonarr_get_series(series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
+            inst = ArrInstance.objects.filter(enabled=True, kind='sonarr').order_by('order', 'id')
+            for s in inst:
+                try:
+                    details = sonarr_get_series(series_id, base_url=s.base_url, api_key=s.api_key)
+                    if details:
+                        break
+                except Exception:
+                    continue
+            if not details:
+                cfg = AppSettings.current()
+                if cfg.sonarr_url and cfg.sonarr_api_key:
+                    details = sonarr_get_series(series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
         except Exception:
             details = None
         defaults = {
@@ -349,10 +360,21 @@ class SeriesUnsubscribeView(APIView):
 class MovieSubscribeView(APIView):
     def post(self, request, title):
         from .services import radarr_lookup_movie_by_title
-        cfg = AppSettings.current()
+        # Try enabled Radarr instances first, fallback to legacy single instance
         details = None
         try:
-            details = radarr_lookup_movie_by_title(title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
+            inst = ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order', 'id')
+            for r in inst:
+                try:
+                    details = radarr_lookup_movie_by_title(title, base_url=r.base_url, api_key=r.api_key)
+                    if details and (details.get('movie_id') or 0) != 0:
+                        break
+                except Exception:
+                    continue
+            if not details:
+                cfg = AppSettings.current()
+                if cfg.radarr_url and cfg.radarr_api_key:
+                    details = radarr_lookup_movie_by_title(title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
         except Exception:
             details = None
         defaults = {

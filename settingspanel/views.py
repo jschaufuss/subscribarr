@@ -14,8 +14,12 @@ from .models import AppSettings, ArrInstance
 from django.http import JsonResponse
 from accounts.utils import jellyfin_admin_required
 from arr_api.models import SeriesSubscription, MovieSubscription
+from arr_api.models import SentNotification
 from django.db.models import Count
 import requests
+from django.core.mail import send_mail
+from django.conf import settings as dj_settings
+from django.utils import timezone
 
 def needs_setup():
     """Check if the app needs first-run setup"""
@@ -97,6 +101,55 @@ def test_connection(request):
         return JsonResponse({"ok": False, "error": f"HTTP {r.status_code}"})
     except requests.RequestException as e:
         return JsonResponse({"ok": False, "error": str(e)})
+
+
+@jellyfin_admin_required
+def test_notify(request):
+    """Send a test notification via email/ntfy/apprise.
+    Query params: channel=email|ntfy|apprise (default: email)
+    For email: uses current user's email; for ntfy/apprise: uses user's overrides plus app defaults.
+    """
+    channel = (request.GET.get("channel") or "email").strip().lower()
+    user = request.user
+    title = "Subscribarr test notification"
+    body = "This is a test notification from Subscribarr settings."
+    from arr_api.notifications import _dispatch_user_notification, _set_runtime_email_settings
+
+    # Force user's channel for this test if requested; otherwise dispatch to chosen channel explicitly
+    if channel in ("ntfy", "apprise"):
+        # Temporarily override user's preferred channel for this dispatch
+        orig = getattr(user, 'notification_channel', 'email')
+        try:
+            setattr(user, 'notification_channel', channel)
+            ok = _dispatch_user_notification(user, subject=title, body_text=body, html_message=None)
+            return JsonResponse({"ok": bool(ok)})
+        finally:
+            setattr(user, 'notification_channel', orig)
+    else:
+        # email
+        try:
+            _set_runtime_email_settings()
+            to = [user.email] if getattr(user, 'email', None) else []
+            if not to:
+                return JsonResponse({"ok": False, "error": "User has no email address set"}, status=400)
+            send_mail(title, body, dj_settings.DEFAULT_FROM_EMAIL, to, fail_silently=False)
+            return JsonResponse({"ok": True})
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+
+@jellyfin_admin_required
+def reset_notify_tokens(request):
+    """Delete today's SentNotification tokens for testing.
+    Optional query param: scope=me|all (default: me)
+    """
+    scope = (request.GET.get('scope') or 'me').strip().lower()
+    today = timezone.now().date()
+    qs = SentNotification.objects.filter(air_date=today)
+    if scope != 'all':
+        qs = qs.filter(user=request.user)
+    deleted, _ = qs.delete()
+    return JsonResponse({"ok": True, "deleted": deleted})
 
 @method_decorator(jellyfin_admin_required, name='dispatch')
 class SettingsView(View):
