@@ -2,12 +2,14 @@
 
 {% block content %}
 <div class="auth-container">
-    <h2>Sign in</h2>
+    <div class="auth-header">
+        <h2 class="auth-title">Sign in with Jellyfin</h2>
+        <p class="auth-subtitle">Use your Jellyfin account to continue.</p>
+    </div>
     <form method="post" class="auth-form">
         {% csrf_token %}
         {{ form.as_p }}
-    <button type="submit" class="btn-primary">Sign in</button>
+        <button type="submit" class="btn-primary">Sign in with Jellyfin</button>
     </form>
-    <!-- Local registration disabled: Jellyfin-only login -->
 </div>
 {% endblock %}

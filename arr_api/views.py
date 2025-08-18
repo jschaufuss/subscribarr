@@ -55,6 +55,7 @@ def _arr_conf_from_db():
 #            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
+@method_decorator(login_required, name='dispatch')
 class ArrIndexView(View):
     def get(self, request):
         q = (request.GET.get("q") or "").lower().strip()
@@ -133,6 +134,7 @@ class ArrIndexView(View):
         })
 
 
+@method_decorator(login_required, name='dispatch')
 class CalendarView(View):
     def get(self, request):
         days = _get_int(request, "days", 60)
