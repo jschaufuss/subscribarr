@@ -1,12 +1,39 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_style %}
+<style>
+/* Hide mobile top nav (hamburger + links) on the login page */
+.main-nav { display: none !important; }
+@media (min-width: 1024px) {
+    /* Remove left gap when sidebar is hidden on the login page */
+    .content { margin-left: 0 !important; }
+}
+/* Center the heading and subtitle inside the login box */
+.auth-form .auth-title,
+.auth-form .auth-subtitle { text-align: center; }
+
+/* Center the submit button without making it full width */
+.auth-form .btn-primary { display: block; margin: 8px auto 0; }
+/* Mobile: scale the login logo down for small screens */
+@media (max-width: 520px) {
+    .auth-logo img { height: 110px !important; }
+}
+</style>
+{% endblock %}
+
+{% block sidebar %}{% endblock %}
 
 {% block content %}
 <div class="auth-container">
     <div class="auth-header">
-        <h2 class="auth-title">Sign in with Jellyfin</h2>
-        <p class="auth-subtitle">Use your Jellyfin account to continue.</p>
+        <div class="auth-logo" style="text-align:center; margin-bottom: 12px;">
+            <img src="{% static 'images/logo.png' %}" alt="Subscribarr" style="height:150px; width:auto; opacity:0.95;" />
+        </div>
     </div>
     <form method="post" class="auth-form">
+        <h2 class="auth-title">Sign in with Jellyfin</h2>
+        <p class="auth-subtitle">Use your Jellyfin account to continue.</p>
         {% csrf_token %}
         {{ form.as_p }}
         <button type="submit" class="btn-primary">Sign in with Jellyfin</button>
