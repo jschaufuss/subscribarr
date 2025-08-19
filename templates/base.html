@@ -22,6 +22,12 @@
             <div id="nav-menu" class="nav-links">
                 {% if user.is_authenticated %}
                 <span class="user-info">Signed in as <strong>{{ user.username }}</strong></span>
+                <a href="{% url 'youtube:index' %}" class="nav-youtube">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M23.5 6.2a4 4 0 0 0-2.8-2.8C18.9 2.8 12 2.8 12 2.8s-6.9 0-8.7.6A4 4 0 0 0 .5 6.2 41.8 41.8 0 0 0 0 12c0 1.9.1 3.9.5 5.8a4 4 0 0 0 2.8 2.8c1.8.6 8.7.6 8.7.6s6.9 0 8.7-.6a4 4 0 0 0 2.8-2.8c.4-1.9.5-3.9.5-5.8 0-1.9-.1-3.9-.5-5.8zM9.8 15.5V8.5L15.8 12l-6 3.5z"/>
+                    </svg>
+                    YouTube
+                </a>
                 <a href="{% url 'accounts:profile' %}" class="nav-profile">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -74,6 +80,7 @@
                     <a href="/?kind=all">All</a>
                     <a href="/?kind=series">Series</a>
                     <a href="/?kind=movies">Movies</a>
+                    <a href="{% url 'youtube:index' %}">YouTube</a>
                 </nav>
                 <div class="side-bottom">
                     <a href="/calendar/" class="calendar-link">📅 Calendar</a>

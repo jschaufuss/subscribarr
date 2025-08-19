@@ -105,6 +105,31 @@
         {% else %}
     <p class="muted">No movies subscribed.</p>
         {% endif %}
+
+    <h4>YouTube</h4>
+        {% if yt_items %}
+        {% static 'images/youtube.png' as yt_icon %}
+        <div class="subscription-list">
+            {% for it in yt_items %}
+            {% with y=it.sub m=it.meta %}
+            <div class="subscription-item">
+                <img src="{{ m.image|default:yt_icon }}" alt="YouTube" class="subscription-poster" style="object-fit: cover; background: #000">
+                <div class="subscription-info">
+                    {% if m.url %}
+                    <a href="{{ m.url }}" target="_blank" rel="noopener" class="subscription-title" style="color: var(--text); text-decoration: none">{{ m.title|default:y.title }}</a>
+                    {% else %}
+                    <div class="subscription-title">{{ m.title|default:y.title }}</div>
+                    {% endif %}
+                    <div class="subscription-date">{{ y.get_kind_display }} — ID: {{ y.target_id }}</div>
+                    <div class="subscription-date">Subscribed on {{ y.created_at|date:"d.m.Y" }}</div>
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+        {% else %}
+    <p class="muted">No YouTube subscriptions.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

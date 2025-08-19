@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'arr_api',
     'settingspanel',
     'accounts',
+    'youtube',
 ]
 
 MIDDLEWARE = [

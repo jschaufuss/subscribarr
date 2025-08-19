@@ -21,4 +21,5 @@ urlpatterns = [
     path('', include('arr_api.urls')),
     path('settings/', include('settingspanel.urls')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('youtube/', include('youtube.urls', namespace='youtube')),
 ]

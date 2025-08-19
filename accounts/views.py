@@ -26,6 +26,20 @@ def profile(request):
     # Load subscriptions
     series_subs = request.user.series_subscriptions.all()
     movie_subs = request.user.movie_subscriptions.all()
+    yt_subs = request.user.yt_subscriptions.all().order_by('kind', 'title')
+    # Enrich with metadata (title/image/url) best-effort
+    yt_items = []
+    try:
+        from youtube.services import get_youtube_metadata
+        for s in yt_subs:
+            meta = {}
+            try:
+                meta = get_youtube_metadata(s.kind, s.target_id) or {}
+            except Exception:
+                meta = {}
+            yt_items.append({'sub': s, 'meta': meta})
+    except Exception:
+        yt_items = [{'sub': s, 'meta': {}} for s in yt_subs]
 
     # Best-effort Backfill fehlender Poster, damit die Profilseite Bilder zeigt
     try:
@@ -93,6 +107,8 @@ def profile(request):
         'form': form,
         'series_subs': series_subs,
         'movie_subs': movie_subs,
+    'yt_subs': yt_subs,
+    'yt_items': yt_items,
     })
 
 def jellyfin_login(request):

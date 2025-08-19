@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}YouTube Subscriptions{% endblock %}
+{% block extra_style %}
+<link rel="stylesheet" href="{% static 'css/settings.css' %}">
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>YouTube</h1>
+  <p class="muted">Subscribe to channels or playlists to get notified about new videos.</p>
+
+  <div class="card" style="max-width:720px">
+    <form method="post" action="{% url 'youtube:subscribe' %}" class="inline-form" id="yt-form">
+      {% csrf_token %}
+    </form>
+    <div class="row">
+      <label>Type</label>
+      <select id="yt-kind" class="input-wide">
+        <option value="channel">Channel</option>
+        <option value="playlist">Playlist</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>ID or URL</label>
+      <input id="yt-id" class="input-wide" placeholder="https://www.youtube.com/@channel | UC... | PL...">
+    </div>
+    <div class="row">
+      <label>Title (optional)</label>
+      <input id="yt-title" class="input-wide" placeholder="Display name">
+    </div>
+  <div class="card-actions">
+      <button class="btn btn-primary" id="yt-sub">Subscribe</button>
+    </div>
+  </div>
+
+  <h2>Your subscriptions</h2>
+  {% if sub_items %}
+  <div class="subscription-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">
+    {% for it in sub_items %}
+    {% with s=it.sub m=it.meta %}
+    <div class="subscription-item" style="display:flex;gap:10px;background:rgba(0,0,0,.2);padding:10px;border-radius:10px;align-items:center;">
+      <img src="{{ m.image|default:'/static/images/youtube.png' }}" alt="thumb" style="width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000">
+      <div style="flex:1;min-width:0;">
+        <div class="subscription-title" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ s.title }}">{{ m.title|default:s.title }}</div>
+        <div class="subscription-date" style="font-size:.9rem;color:var(--muted)">{{ s.get_kind_display }} · {{ s.target_id }}</div>
+        <div class="subscription-date" style="font-size:.9rem;color:var(--muted)">Subscribed on {{ s.created_at|date:"d.m.Y" }}</div>
+      </div>
+      <form method="post" action="{% url 'youtube:unsubscribe' %}" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="kind" value="{{ s.kind }}">
+        <input type="hidden" name="target_id" value="{{ s.target_id }}">
+        <button class="btn">Unsubscribe</button>
+      </form>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">No YouTube subscriptions yet.</p>
+  {% endif %}
+</div>
+<script>
+(function(){
+  function extractId(input){
+    input = input.trim();
+    if(!input) return '';
+    try{
+      if(input.startsWith('http')){
+        const u = new URL(input);
+        // channel URLs: /channel/UC..., /@handle, playlist URLs: list=PL...
+        if(u.pathname.startsWith('/channel/')) return u.pathname.split('/')[2];
+        const list = u.searchParams.get('list');
+        if(list && (list.startsWith('PL')||list.startsWith('UU'))) return list;
+        if(u.pathname.startsWith('/@')) return u.pathname; // keep handle; resolver can handle later
+      }
+    }catch(e){}
+    return input;
+  }
+  const btn = document.getElementById('yt-sub');
+  btn && btn.addEventListener('click', async ()=>{
+    const kind = document.getElementById('yt-kind').value;
+    const raw = document.getElementById('yt-id').value;
+    const target_id = extractId(raw);
+    const title = document.getElementById('yt-title').value;
+    if(!target_id){ alert('Please enter a channel or playlist ID/URL'); return; }
+    const fd = new FormData(); fd.append('kind', kind); fd.append('target_id', target_id); fd.append('title', title);
+    const csrf = document.querySelector('#yt-form [name=csrfmiddlewaretoken]')?.value;
+    const r = await fetch("{% url 'youtube:subscribe' %}", { method:'POST', body:fd, headers:{'X-CSRFToken': csrf} });
+    const j = await r.json(); if(!j.ok) return alert(j.error||'Error'); location.reload();
+  });
+})();
+</script>
+{% endblock %}

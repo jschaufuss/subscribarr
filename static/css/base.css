@@ -232,3 +232,6 @@ body {
 .nav-admin {
     color: var(--accent) !important;
 }
+
+/* Generic helpers */
+.muted { color: var(--muted); }
