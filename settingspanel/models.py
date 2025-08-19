@@ -44,6 +44,9 @@ class AppSettings(models.Model):
     # Notifications - Apprise (default target URLs, optional)
     apprise_default_url = models.TextField(blank=True, null=True, help_text="Apprise URL(s). Multiple allowed, one per line.")
 
+    # Notification behavior
+    notify_lookahead_days = models.PositiveSmallIntegerField(default=1, help_text="How many days ahead to consider for notifications (early availability). Set to 0 or 1 for only today.")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

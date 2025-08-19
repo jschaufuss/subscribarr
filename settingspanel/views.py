@@ -140,12 +140,18 @@ def test_notify(request):
 
 @jellyfin_admin_required
 def reset_notify_tokens(request):
-    """Delete today's SentNotification tokens for testing.
+    """Delete SentNotification tokens for testing.
+    Removes entries with air_date in [today .. today+lookahead_days].
     Optional query param: scope=me|all (default: me)
     """
     scope = (request.GET.get('scope') or 'me').strip().lower()
     today = timezone.now().date()
-    qs = SentNotification.objects.filter(air_date=today)
+    try:
+        la = max(0, int(getattr(AppSettings.current(), 'notify_lookahead_days', 1) or 0))
+    except Exception:
+        la = 0
+    end_date = today + timezone.timedelta(days=la)
+    qs = SentNotification.objects.filter(air_date__gte=today, air_date__lte=end_date)
     if scope != 'all':
         qs = qs.filter(user=request.user)
     deleted, _ = qs.delete()
@@ -216,6 +222,7 @@ class SettingsView(View):
                 "ntfy_password": cfg.ntfy_password or "",
                 "ntfy_token": cfg.ntfy_token or "",
                 "apprise_default_url": cfg.apprise_default_url or "",
+                "notify_lookahead_days": cfg.notify_lookahead_days or 1,
             }),
         })
 
@@ -265,6 +272,12 @@ class SettingsView(View):
         cfg.ntfy_password      = notify_form.cleaned_data.get("ntfy_password") or None
         cfg.ntfy_token         = notify_form.cleaned_data.get("ntfy_token") or None
         cfg.apprise_default_url = notify_form.cleaned_data.get("apprise_default_url") or None
+        # Notification behavior
+        nad = notify_form.cleaned_data.get("notify_lookahead_days")
+        try:
+            cfg.notify_lookahead_days = max(0, min(30, int(nad))) if nad is not None else cfg.notify_lookahead_days
+        except Exception:
+            pass
 
         cfg.save()
         # Save instances with minor normalization

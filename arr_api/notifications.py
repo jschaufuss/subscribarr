@@ -2,6 +2,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
+from datetime import timedelta
 from settingspanel.models import AppSettings, ArrInstance
 # from accounts.utils import JellyfinClient  # not needed for availability; use Sonarr/Radarr instead
 import requests
@@ -251,12 +252,12 @@ def radarr_movie_has_file(movie_id: int) -> bool:
     return False
 
 
-def get_todays_sonarr_calendar():
+def get_todays_sonarr_calendar(lookahead_days: int = 0):
     from .services import sonarr_calendar
     items = []
     for inst in _enabled_instances('sonarr'):
         try:
-            items.extend(sonarr_calendar(days=1, base_url=inst.base_url, api_key=inst.api_key) or [])
+            items.extend(sonarr_calendar(days=max(1, 1+int(lookahead_days)), base_url=inst.base_url, api_key=inst.api_key) or [])
         except Exception:
             continue
     today = timezone.now().date()
@@ -264,19 +265,19 @@ def get_todays_sonarr_calendar():
     for it in items:
         try:
             ad = isoparse(it.get("airDateUtc")) if it.get("airDateUtc") else None
-            if ad and ad.date() == today:
+            if ad and today <= ad.date() <= (today + timedelta(days=max(0,int(lookahead_days)))):
                 todays.append(it)
         except Exception:
             pass
     return todays
 
 
-def get_todays_radarr_calendar():
+def get_todays_radarr_calendar(lookahead_days: int = 0):
     from .services import radarr_calendar
     items = []
     for inst in _enabled_instances('radarr'):
         try:
-            items.extend(radarr_calendar(days=1, base_url=inst.base_url, api_key=inst.api_key) or [])
+            items.extend(radarr_calendar(days=max(1, 1+int(lookahead_days)), base_url=inst.base_url, api_key=inst.api_key) or [])
         except Exception:
             continue
     today = timezone.now().date()
@@ -289,7 +290,7 @@ def get_todays_radarr_calendar():
                 continue
             try:
                 d = isoparse(v).date()
-                if d == today:
+                if today <= d <= (today + timedelta(days=max(0,int(lookahead_days)))):
                     todays.append(it)
                     break
             except Exception:
@@ -318,8 +319,10 @@ def check_and_notify_users():
     from .models import SeriesSubscription, MovieSubscription, SentNotification
 
     # calendars for today
-    todays_series = get_todays_sonarr_calendar()
-    todays_movies = get_todays_radarr_calendar()
+    cfg = AppSettings.current()
+    la = max(0, int(getattr(cfg, 'notify_lookahead_days', 1) or 0))
+    todays_series = get_todays_sonarr_calendar(lookahead_days=la)
+    todays_movies = get_todays_radarr_calendar(lookahead_days=la)
 
     # index by ids for quick lookup
     series_idx = {}
@@ -353,6 +356,7 @@ def check_and_notify_users():
 
             # duplicate guard will be handled atomically before dispatch
             # check availability via Sonarr hasFile
+            # Early availability: notify immediately if file present, regardless of whether air date is today or within lookahead
             if sonarr_episode_has_file(sub.series_id, season, number):
                 # Build subject/body
                 subj = f"New episode available: {sub.series_title} S{season:02d}E{number:02d}"
@@ -432,6 +436,7 @@ def check_and_notify_users():
         if event_date and getattr(sub, 'created_at', None) and sub.created_at.date() > event_date:
             continue
 
+        # Early availability: notify immediately if file present (within lookahead window fetch)
         if radarr_movie_has_file(sub.movie_id):
             # detect which release matched today
             rel = None

@@ -81,6 +81,10 @@ class NotificationSettingsForm(forms.Form):
         label="Apprise URL(s)", required=False, widget=forms.Textarea(attrs={"rows": 3, "class": "input-wide"}),
         help_text="One per line. See https://github.com/caronc/apprise/wiki for URL formats."
     )
+    notify_lookahead_days = forms.IntegerField(
+        label="Lookahead (days)", required=False, min_value=0, max_value=30,
+        help_text="Consider items up to N days in the future for notifications if file is already available."
+    )
 
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)
