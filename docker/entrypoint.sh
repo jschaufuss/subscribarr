@@ -66,8 +66,8 @@ s.save()
 print("AppSettings seeded from environment (if provided)")
 PY
 
-# Setup cron if schedule provided
-if [ -n "${CRON_SCHEDULE:-}" ]; then
+# Setup cron if any schedule provided
+if [ -n "${CRON_SCHEDULE:-}" ] || [ -n "${CRON_4K_SCHEDULE:-}" ]; then
   cat >/etc/cron.d/subscribarr <<EOF
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -75,10 +75,18 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # gleiche DB wie die App:
 DB_PATH=${DB_PATH:-/app/data/db.sqlite3}
 PYTHON=/usr/local/bin/python
-
-# <m h dom mon dow> <user> <cmd>
-${CRON_SCHEDULE} root cd /app && \$PYTHON manage.py migrate --noinput && \$PYTHON manage.py check_new_media >> /app/cron.log 2>&1
 EOF
+
+  # check_new_media on CRON_SCHEDULE, if provided
+  if [ -n "${CRON_SCHEDULE:-}" ]; then
+    echo "${CRON_SCHEDULE} root cd /app && \$PYTHON manage.py migrate --noinput && \$PYTHON manage.py check_new_media >> /app/cron.log 2>&1" >> /etc/cron.d/subscribarr
+  fi
+
+  # check_4k on its own schedule, or fall back to CRON_SCHEDULE
+  SCHED_4K=${CRON_4K_SCHEDULE:-${CRON_SCHEDULE:-}}
+  if [ -n "$SCHED_4K" ]; then
+    echo "$SCHED_4K root cd /app && \$PYTHON manage.py check_4k >> /app/cron.log 2>&1" >> /etc/cron.d/subscribarr
+  fi
 
   chmod 0644 /etc/cron.d/subscribarr
   /usr/sbin/cron

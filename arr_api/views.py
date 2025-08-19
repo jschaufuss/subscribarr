@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from settingspanel.models import AppSettings, ArrInstance
-from .services import sonarr_calendar, radarr_calendar, ArrServiceError
-from .models import SeriesSubscription, MovieSubscription
+from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id
+from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
 
 
@@ -414,3 +414,112 @@ class ListMovieSubscriptionsView(APIView):
     def get(self, request):
         subs = MovieSubscription.objects.filter(user=request.user).values_list('title', flat=True)
         return Response(list(subs))
+
+
+@method_decorator(login_required, name='dispatch')
+class FourKIndexView(View):
+    def get(self, request):
+        # Aggregate list of movies missing 4K across all Radarr instances
+        q = (request.GET.get('q') or '').strip().lower()
+        page = request.GET.get('page') or '1'
+        pp_raw = (request.GET.get('pp') or '').strip().lower()
+        try:
+            page = max(1, int(page))
+        except Exception:
+            page = 1
+        # per-page options: 15,25,50,100 or 'all'; default 25
+        per_page_options = [15, 25, 50, 100]
+        per_page = 25
+        pp_is_all = False
+        if pp_raw in ('all', 'alle'):
+            pp_is_all = True
+            per_page = None
+        else:
+            try:
+                pp_int = int(pp_raw) if pp_raw else per_page
+                if pp_int in per_page_options:
+                    per_page = pp_int
+            except Exception:
+                pass
+
+        items = []
+        try:
+            items = list_movies_missing_4k_across_instances()
+        except Exception:
+            items = []
+
+        if q:
+            items = [it for it in items if q in (str(it.get('title') or '').lower())]
+
+        # sort stable by title/year
+        items.sort(key=lambda it: (str(it.get('title') or '').lower(), it.get('year') or 0))
+
+        total = len(items)
+        if not pp_is_all and per_page:
+            start = (page - 1) * per_page
+            end = start + per_page
+            items = items[start:end]
+
+        # Mark already 4K-subscribed ones for current user
+        sub_tmdb = set(Movie4KSubscription.objects.filter(user=request.user).values_list('tmdb_id', flat=True))
+        for it in items:
+            it['is_subscribed_4k'] = int(it.get('tmdbId') or 0) in sub_tmdb
+
+        if pp_is_all or not per_page:
+            pages = 1
+            page = 1
+            has_prev = has_next = False
+        else:
+            pages = (total + per_page - 1) // per_page if total else 1
+            has_prev = page > 1
+            has_next = page < pages
+
+        return render(request, "arr_api/movies_4k.html", {
+            "items": items,
+            "q": q,
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "has_prev": has_prev,
+            "has_next": has_next,
+            "prev_page": page - 1 if has_prev else None,
+            "next_page": page + 1 if has_next else None,
+            "pp": ("all" if pp_is_all else per_page),
+            "per_page_options": per_page_options,
+            "pp_is_all": pp_is_all,
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class Movie4KSubscribeView(APIView):
+    def post(self, request, tmdb_id: int):
+        # If the movie is already available in 4K anywhere, we can send notification immediately and still store token to dedupe future.
+        # Store a friendly title/poster for UI by looking up metadata from any Radarr.
+        title = request.data.get('title') if request.data else None
+        poster = request.data.get('poster') if request.data else None
+        details = None
+        if not title or not poster:
+            try:
+                # Try across enabled instances
+                for inst in ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order','id'):
+                    details = radarr_lookup_movie_by_tmdb_id(tmdb_id, base_url=inst.base_url, api_key=inst.api_key)
+                    if details:
+                        break
+            except Exception:
+                details = None
+        sub, created = Movie4KSubscription.objects.get_or_create(
+            user=request.user,
+            tmdb_id=tmdb_id,
+            defaults={
+                'title': (title or (details.get('title') if details else '')) or '',
+                'poster': (poster or (details.get('poster') if details else '')) or '',
+            }
+        )
+        return Response({'status': 'subscribed'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@method_decorator(login_required, name='dispatch')
+class Movie4KUnsubscribeView(APIView):
+    def post(self, request, tmdb_id: int):
+        Movie4KSubscription.objects.filter(user=request.user, tmdb_id=tmdb_id).delete()
+        return Response({'status': 'unsubscribed'}, status=status.HTTP_200_OK)

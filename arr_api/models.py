@@ -50,3 +50,31 @@ class SentNotification(models.Model):
 
     def __str__(self):
         return f"{self.media_type}: {self.media_title} for {self.user.username} on {self.air_date}"
+
+
+class Movie4KSubscription(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='movie4k_subscriptions')
+    tmdb_id = models.IntegerField()
+    title = models.CharField(max_length=255)
+    poster = models.URLField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'tmdb_id']
+
+    def __str__(self):
+        return f"4K: {self.title}"
+
+
+class Movie4KSentNotification(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    tmdb_id = models.IntegerField()
+    title = models.CharField(max_length=255)
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'tmdb_id']
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f"4K sent {self.tmdb_id} -> {self.user}"

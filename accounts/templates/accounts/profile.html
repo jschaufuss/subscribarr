@@ -106,6 +106,28 @@
     <p class="muted">No movies subscribed.</p>
         {% endif %}
 
+    <h4>Movies (4K)</h4>
+        {% if movie4k_subs %}
+        <div class="subscription-list">
+            {% for sub in movie4k_subs %}
+            <div class="subscription-item">
+                {% if sub.poster %}
+                <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
+                {% else %}
+                <img src="https://via.placeholder.com/80x120?text=No+Poster" alt="" class="subscription-poster">
+                {% endif %}
+                <div class="subscription-info">
+                    <div class="subscription-title">{{ sub.title|default:"(unknown)" }}</div>
+                    <div class="subscription-date">TMDB: {{ sub.tmdb_id }}</div>
+                    <div class="subscription-date">Subscribed on {{ sub.created_at|date:"d.m.Y" }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+    <p class="muted">No 4K subscriptions.</p>
+        {% endif %}
+
     <h4>YouTube</h4>
         {% if yt_items %}
         {% static 'images/youtube.png' as yt_icon %}

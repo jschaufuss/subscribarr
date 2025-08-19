@@ -26,6 +26,7 @@ def profile(request):
     # Load subscriptions
     series_subs = request.user.series_subscriptions.all()
     movie_subs = request.user.movie_subscriptions.all()
+    movie4k_subs = request.user.movie4k_subscriptions.all().order_by('title')
     yt_subs = request.user.yt_subscriptions.all().order_by('kind', 'title')
     # Enrich with metadata (title/image/url) best-effort
     yt_items = []
@@ -44,7 +45,11 @@ def profile(request):
     # Best-effort Backfill fehlender Poster, damit die Profilseite Bilder zeigt
     try:
         from settingspanel.models import AppSettings, ArrInstance
-        from arr_api.services import sonarr_get_series, radarr_lookup_movie_by_title
+        from arr_api.services import (
+            sonarr_get_series,
+            radarr_lookup_movie_by_title,
+            radarr_lookup_movie_by_tmdb_id,
+        )
         cfg = AppSettings.current()
         # choose any enabled instance if legacy fields are not set
         sonarr_conf = None
@@ -99,6 +104,20 @@ def profile(request):
                     if not sub.genres:
                         sub.genres = details.get('genres') or []
                     sub.save(update_fields=['poster', 'overview', 'genres'])
+    # Movies 4K
+        for sub in movie4k_subs:
+            if not sub.poster and getattr(sub, 'tmdb_id', None):
+                details = None
+                try:
+                    if radarr_conf:
+                        details = radarr_lookup_movie_by_tmdb_id(sub.tmdb_id, base_url=radarr_conf[0], api_key=radarr_conf[1])
+                except Exception:
+                    details = None
+                if details and details.get('poster'):
+                    sub.poster = details['poster']
+                    if not sub.title:
+                        sub.title = details.get('title') or sub.title
+                    sub.save(update_fields=['poster', 'title'])
     except Exception:
         # still show page even if lookups fail
         pass
@@ -107,6 +126,7 @@ def profile(request):
         'form': form,
         'series_subs': series_subs,
         'movie_subs': movie_subs,
+    'movie4k_subs': movie4k_subs,
     'yt_subs': yt_subs,
     'yt_items': yt_items,
     })

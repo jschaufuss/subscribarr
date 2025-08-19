@@ -4,6 +4,7 @@ from .views import (
     MovieSubscribeView, MovieUnsubscribeView,
     ListSeriesSubscriptionsView, ListMovieSubscriptionsView,
     CalendarView, CalendarEventsApi,
+    FourKIndexView, Movie4KSubscribeView, Movie4KUnsubscribeView,
 )
 
 app_name = 'arr_api'
@@ -13,6 +14,11 @@ urlpatterns = [
     # Calendar
     path('calendar/', CalendarView.as_view(), name='calendar'),
     path('api/calendar/events/', CalendarEventsApi.as_view(), name='calendar-events'),
+
+    # 4K section
+    path('movies-4k/', FourKIndexView.as_view(), name='movies-4k'),
+    path('api/movies4k/subscribe/<int:tmdb_id>/', Movie4KSubscribeView.as_view(), name='subscribe-movie4k'),
+    path('api/movies4k/unsubscribe/<int:tmdb_id>/', Movie4KUnsubscribeView.as_view(), name='unsubscribe-movie4k'),
     
     # Series URLs
     path('api/series/subscribe/<int:series_id>/', SeriesSubscribeView.as_view(), name='subscribe-series'),
