@@ -64,6 +64,42 @@
         </div>
     </nav>
 
+        <!-- Desktop-only sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-inner">
+                <a href="/" class="brand">
+                    <img src="{% static 'images/logo.png' %}" alt="Subscribarr" class="nav-logo">
+                </a>
+                <nav class="side-links" aria-label="Primary">
+                    <a href="/?kind=all">All</a>
+                    <a href="/?kind=series">Series</a>
+                    <a href="/?kind=movies">Movies</a>
+                </nav>
+                <div class="side-bottom">
+                    <a href="/calendar/" class="calendar-link">📅 Calendar</a>
+                    {% if user.is_authenticated %}
+                    <div class="side-footer">
+                        {% if user.is_jellyfin_admin %}
+                        <a href="{% url 'settingspanel:index' %}" class="side-action">Administration</a>
+                        {% endif %}
+                        <a href="{% url 'accounts:profile' %}" class="side-action">Profile</a>
+                        <div class="side-auth">
+                            <div class="signed-in">Signed in as <strong>{{ user.username }}</strong></div>
+                            <form method="post" action="{% url 'accounts:logout' %}" class="inline-form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-link nav-logout">Sign out</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+
+        <div class="content">
+            {% block content %}{% endblock %}
+        </div>
+
     <script>
     (function(){
         const btn = document.querySelector('.nav-toggle');
@@ -75,8 +111,6 @@
         });
     })();
     </script>
-
-    {% block content %}{% endblock %}
 </body>
 
 </html>

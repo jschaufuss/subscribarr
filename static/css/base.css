@@ -117,6 +117,31 @@ body {
     align-items: center;
 }
 
+/* Desktop sidebar layout */
+.sidebar { display: none; }
+.content { padding: 0 16px; }
+
+@media (min-width: 1024px) {
+    .main-nav { display: none; }
+    .sidebar { display: block; position: fixed; top: 0; left: 0; bottom: 0; width: 256px; background: var(--panel); border-right: 1px solid var(--panel-b); }
+    .sidebar-inner { display: flex; flex-direction: column; height: 100%; padding: 16px; gap: 16px; }
+    .sidebar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-weight: 700; font-size: 1.1rem; }
+    .sidebar .side-links { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .sidebar .side-links a { color: var(--text); text-decoration: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); }
+    .sidebar .side-links a:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+    .sidebar .calendar-link { display: block; text-decoration: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); color: var(--text); font-weight: 600; }
+    .sidebar .calendar-link:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .side-footer { border-top: 2px solid rgba(255,255,255,0.16); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .sidebar .side-auth { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .sidebar .side-auth .inline-form { margin: 0; }
+    .sidebar .side-auth .btn-link { padding: 8px 14px; min-width: 110px; text-align: center; border-radius: 10px; }
+    .sidebar .side-action { color: var(--text); text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); text-decoration: none; }
+    .sidebar .side-action:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .signed-in { color: var(--muted); line-height: 1.2; }
+    .content { margin-left: 256px; padding: 16px; }
+}
+
 .nav-brand {
     color: var(--text);
     text-decoration: none;
