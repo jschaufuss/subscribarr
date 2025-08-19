@@ -1,22 +1,14 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Settings – Subscribarr</title>
-    <link rel="stylesheet" href="{% static 'css/settings.css' %}">
-</head>
-
-<body>
+{% block title %}Settings – Subscribarr{% endblock %}
+{% block extra_style %}<link rel="stylesheet" href="{% static 'css/settings.css' %}">{% endblock %}
+{% block content %}
     <div class="wrap">
         <div class="topbar">
             <div style="display:flex; gap:8px; align-items:center;">
-                <a href="/" class="btn">← Back</a>
                 <a href="{% url 'settingspanel:subscriptions' %}" class="btn">👥 Subscriptions</a>
             </div>
-            <div><strong>Settings</strong></div>
+            <div></div>
             <div></div>
         </div>
 
@@ -24,7 +16,7 @@
         <div class="msgs">{% for m in messages %}<div class="msg">{{ m }}</div>{% endfor %}</div>
         {% endif %}
 
-        <form method="post">
+    <form method="post">
             {% csrf_token %}
             <div class="grid">
                 <div class="card">
@@ -38,6 +30,9 @@
                         <label>Jellyfin API Key</label>
                         {{ jellyfin_form.jellyfin_api_key }}
                         <div class="help">Admin API key from your Jellyfin settings</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
                     </div>
                 </div>
 
@@ -99,6 +94,9 @@
                         <button class="btn" type="button" onclick="addInstance()">+ Add instance</button>
                     </div>
                     <div class="help">Click “Test” to verify against /api/v3/system/status.</div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -115,11 +113,13 @@
                             <button class="btn" type="button" onclick="testNotify('email', this)">Send test email</button>
                         </div>
                     </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
                 <div class="card">
-                    <h2>Notifications</h2>
-                    <h3>ntfy</h3>
+                    <h2>Notifications — ntfy</h2>
                     <div class="row"><label>Server URL</label>{{ notify_form.ntfy_server_url }}</div>
                     <div class="row"><label>Default topic</label>{{ notify_form.ntfy_topic_default }}</div>
                     <div class="row"><label>Username</label>{{ notify_form.ntfy_user }}</div>
@@ -131,15 +131,8 @@
                             <button class="btn" type="button" onclick="testNotify('ntfy', this)">Send test ntfy</button>
                         </div>
                     </div>
-
-                    <h3 style="margin-top:12px;">Apprise</h3>
-                    <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
-                    <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
-                    <div class="row">
-                        <label>Test Apprise</label>
-                        <div class="inline-actions">
-                            <button class="btn" type="button" onclick="testNotify('apprise', this)">Send test apprise</button>
-                        </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
                     </div>
                 </div>
 
@@ -153,103 +146,116 @@
                             <button class="btn" type="button" onclick="resetNotify('all', this)">Clear all tokens (today)</button>
                         </div>
                     </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
+                <div class="card">
+                    <h2>Notifications — Apprise</h2>
+                    <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
+                    <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
+                    <div class="row">
+                        <label>Test Apprise</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('apprise', this)">Send test apprise</button>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </div>
                 <!-- Account management removed: Jellyfin-only auth -->
             </div>
 
-            <div style="margin-top:16px">
-                <button class="btn btn-primary" type="submit">Save</button>
-            </div>
+            
         </form>
     </div>
 
-        <script>
+    <script>
+        // Update header text from inputs
+        function updateArrHeader(row){
+            const name = row.querySelector('[name$="-name"]');
+            const kind = row.querySelector('[name$="-kind"]');
+            const enabled = row.querySelector('[name$="-enabled"]');
+            row.querySelector('.arr-name').textContent = (name && name.value.trim()) || '(new)';
+            const kindLabel = kind && kind.options[kind.selectedIndex] ? kind.options[kind.selectedIndex].text : '';
+            row.querySelector('.arr-kind').textContent = kindLabel ? ` — ${kindLabel}` : '';
+            if (enabled){ row.querySelector('.arr-enabled').textContent = enabled.checked ? 'Enabled' : 'Disabled'; }
+        }
 
-                        // Update header text from inputs
-                        function updateArrHeader(row){
-                                const name = row.querySelector('[name$="-name"]');
-                                const kind = row.querySelector('[name$="-kind"]');
-                                const enabled = row.querySelector('[name$="-enabled"]');
-                                row.querySelector('.arr-name').textContent = (name && name.value.trim()) || '(new)';
-                                const kindLabel = kind && kind.options[kind.selectedIndex] ? kind.options[kind.selectedIndex].text : '';
-                                row.querySelector('.arr-kind').textContent = kindLabel ? ` — ${kindLabel}` : '';
-                                if (enabled){ row.querySelector('.arr-enabled').textContent = enabled.checked ? 'Enabled' : 'Disabled'; }
-                        }
+        function toggleArrRow(el){
+            const row = el.closest('.arr-row');
+            if(!row) return;
+            row.classList.toggle('collapsed');
+        }
 
-                        function toggleArrRow(el){
-                                const row = el.closest('.arr-row');
-                                if(!row) return;
-                                row.classList.toggle('collapsed');
-                        }
+        // Template for new instance row (collapsible)
+        function addInstance() {
+            const container = document.getElementById('arr-instances');
+            const totalEl = document.querySelector('#id_form-TOTAL_FORMS');
+            const index = parseInt(totalEl.value, 10);
 
-                        // Template for new instance row (collapsible)
-                        function addInstance() {
-                        const container = document.getElementById('arr-instances');
-                        const totalEl = document.querySelector('#id_form-TOTAL_FORMS');
-                        const index = parseInt(totalEl.value, 10);
+            const html = `
+                <div class="arr-row">
+                    <div class="arr-header" onclick="toggleArrRow(this)">
+                        <div class="arr-title">
+                            <strong class="arr-name">(new)</strong>
+                            <span class="arr-kind"></span>
+                            <span class="badge small arr-enabled">Enabled</span>
+                        </div>
+                        <div class="arr-toggle" onclick="event.stopPropagation()">
+                            <label style="display:inline-flex;align-items:center;gap:6px;">
+                                <input type="checkbox" name="form-${index}-enabled" checked> <span>Enabled</span>
+                            </label>
+                        </div>
+                        <div class="arr-chevron" aria-hidden>▾</div>
+                    </div>
+                    <div class="arr-body">
+                        <div class="row"><label>Type</label>
+                            <select name="form-${index}-kind" class="input-wide">
+                                <option value="sonarr">Sonarr</option>
+                                <option value="radarr">Radarr</option>
+                            </select>
+                        </div>
+                        <div class="row"><label>Name</label><input type="text" name="form-${index}-name" class="input-wide"></div>
+                        <div class="row"><label>Base URL</label><input type="url" name="form-${index}-base_url" class="input-wide" placeholder="http://host:8989 or https://example.com/radarr"><div class="help">Use the app root URL. Avoid /settings or /api paths.</div></div>
+                        <div class="row"><label>API Key</label><input type="password" name="form-${index}-api_key" class="input-wide"></div>
+                        <div class="row inline">
+                            <label>Order</label>
+                            <div class="field">
+                                <input type="number" name="form-${index}-order" value="${index}" class="input-wide" min="0">
+                            </div>
+                            <div class="inline-actions">
+                                <button class="btn" type="button" onclick="testSpecific(this)">Test</button>
+                                <input type="checkbox" name="form-${index}-DELETE" style="display:none;" />
+                                <button class="btn" type="button" onclick="removeRow(this)">Remove</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="form-${index}-id" />
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+            totalEl.value = index + 1;
+            const row = container.lastElementChild;
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(el=> {
+                el.addEventListener('input', ()=>updateArrHeader(row));
+                el.addEventListener('change', ()=>updateArrHeader(row));
+            });
+            updateArrHeader(row);
+        }
 
-                        // Build minimal row using empty prefix
-                                        const html = `
-                                        <div class="arr-row">
-                                            <div class="arr-header" onclick="toggleArrRow(this)">
-                                                <div class="arr-title">
-                                                    <strong class="arr-name">(new)</strong>
-                                                    <span class="arr-kind"></span>
-                                                    <span class="badge small arr-enabled">Enabled</span>
-                                                </div>
-                                                <div class="arr-toggle" onclick="event.stopPropagation()">
-                                                    <label style="display:inline-flex;align-items:center;gap:6px;">
-                                                        <input type="checkbox" name="form-${index}-enabled" checked> <span>Enabled</span>
-                                                    </label>
-                                                </div>
-                                                <div class="arr-chevron" aria-hidden>▾</div>
-                                            </div>
-                                            <div class="arr-body">
-                                                <div class="row"><label>Type</label>
-                                                    <select name="form-${index}-kind" class="input-wide">
-                                                        <option value="sonarr">Sonarr</option>
-                                                        <option value="radarr">Radarr</option>
-                                                    </select>
-                                                </div>
-                                                <div class="row"><label>Name</label><input type="text" name="form-${index}-name" class="input-wide"></div>
-                                                <div class="row"><label>Base URL</label><input type="url" name="form-${index}-base_url" class="input-wide" placeholder="http://host:8989 or https://example.com/radarr"><div class="help">Use the app root URL. Avoid /settings or /api paths.</div></div>
-                                                <div class="row"><label>API Key</label><input type="password" name="form-${index}-api_key" class="input-wide"></div>
-                                                <div class="row inline">
-                                                    <label>Order</label>
-                                                    <div class="field">
-                                                        <input type="number" name="form-${index}-order" value="${index}" class="input-wide" min="0">
-                                                    </div>
-                                                    <div class="inline-actions">
-                                                        <button class="btn" type="button" onclick="testSpecific(this)">Test</button>
-                                                        <input type="checkbox" name="form-${index}-DELETE" style="display:none;" />
-                                                        <button class="btn" type="button" onclick="removeRow(this)">Remove</button>
-                                                    </div>
-                                                </div>
-                                                <input type="hidden" name="form-${index}-id" />
-                                            </div>
-                                        </div>`;
-                        container.insertAdjacentHTML('beforeend', html);
-                        totalEl.value = index + 1;
-                                const row = container.lastElementChild;
-                                        const inputs = row.querySelectorAll('input, select');
-                                        inputs.forEach(el=> {
-                                                el.addEventListener('input', ()=>updateArrHeader(row));
-                                                el.addEventListener('change', ()=>updateArrHeader(row));
-                                        });
-                                updateArrHeader(row);
-                }
-
-                function removeRow(btn){
-                        const row = btn.closest('.arr-row');
-                        if(!row) return;
-                        const del = row.querySelector('input[name$="-DELETE"]');
-                        if(del){
-                                del.checked = true;
-                                row.style.display = 'none';
-                        } else {
-                                row.remove();
-                        }
+        function removeRow(btn){
+            const row = btn.closest('.arr-row');
+            if(!row) return;
+            const del = row.querySelector('input[name$="-DELETE"]');
+            if(del){
+                del.checked = true;
+                row.style.display = 'none';
+            } else {
+                row.remove();
+            }
         }
 
         // Wire up existing rows so header reflects changes immediately
@@ -263,22 +269,6 @@
                 updateArrHeader(row);
             });
         });
-
-        function testConnection(kind) {
-            const url = document.querySelector(`input[name="${kind}_url"]`).value;
-            const key = document.querySelector(`input[name="${kind}_api_key"]`).value;
-
-            fetch(`/settings/test-connection/?kind=${kind}&url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.ok) {
-            alert(kind + " connection successful!");
-                    } else {
-            alert(kind + " error: " + data.error);
-                    }
-                })
-        .catch(err => alert(kind + " error: " + err));
-        }
 
         function setBadge(kind, state, text, tooltip) {
             const el = document.getElementById(kind + "Status");
@@ -297,7 +287,7 @@
             }
         }
 
-    function testConnection(kind, btnEl) {
+        function testConnection(kind, btnEl) {
             const urlEl = document.querySelector(`input[name="${kind}_url"]`);
             const keyEl = document.querySelector(`input[name="${kind}_api_key"]`);
             const url = urlEl ? urlEl.value.trim() : "";
@@ -310,16 +300,16 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) {
-            setBadge(kind, "ok", "Connected", "");
+                        setBadge(kind, "ok", "Connected", "");
                     } else {
-            setBadge(kind, "err", "Error", data.error || "Unknown error");
+                        setBadge(kind, "err", "Error", data.error || "Unknown error");
                     }
                 })
-        .catch(err => setBadge(kind, "err", "Error", String(err)))
+                .catch(err => setBadge(kind, "err", "Error", String(err)))
                 .finally(() => { if (btnEl) btnEl.disabled = false; });
         }
 
-    function testSpecific(btn){
+        function testSpecific(btn){
             const row = btn.closest('.arr-row');
             const kind = (row.querySelector('[name$="-kind"]').value||'').trim();
             const url = (row.querySelector('[name$="-base_url"]').value||'').trim();
@@ -332,7 +322,7 @@
                 .then(r=>r.json())
                 .then(data=>{
                     if(data.ok) alert(kind + ' connection successful!');
-            else alert(kind + ' error: ' + (data.error || 'Unknown error') + '\nCheck base URL (http(s)://host:port) and API key.');
+                    else alert(kind + ' error: ' + (data.error || 'Unknown error') + '\nCheck base URL (http(s)://host:port) and API key.');
                 })
                 .catch(err=>alert(kind + ' error: ' + String(err)));
         }
@@ -360,9 +350,5 @@
                 .catch(err=>alert(`Reset error: ${String(err)}`))
                 .finally(()=>{ if(btn) btn.disabled=false; });
         }
-
     </script>
-
-</body>
-
-</html>
+{% endblock %}

@@ -52,21 +52,34 @@ a {
 
 .grid {
     display: grid;
-    gap: 16px
+    gap: 16px;
+    grid-auto-flow: row dense;
 }
 
 @media(min-width:900px) {
     .grid {
         grid-template-columns: 1fr 1fr
     }
+    .card-span-2 { grid-row: span 2; }
 }
 
 .card {
     background: var(--panel);
     border: 1px solid var(--panel-b);
     border-radius: 12px;
-    padding: 14px
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
 }
+
+.card-actions {
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Slightly tighten vertical rhythm inside cards */
+.card .row:last-of-type { margin-bottom: 6px; }
 
 .card h2 {
     margin: 0 0 10px;
@@ -192,3 +205,11 @@ a {
 .arr-row .arr-chevron { transform: rotate(0deg); transition: transform .15s ease; }
 .arr-row.collapsed .arr-chevron { transform: rotate(-90deg); }
 .badge.small { font-size: .75rem; padding: 2px 8px; }
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+    .wrap { padding: 12px; }
+    .row { grid-template-columns: 1fr; align-items: start; }
+    .row label { margin-bottom: 6px; }
+    .inline-actions { min-width: 0; flex-wrap: wrap; gap: 6px; }
+}
