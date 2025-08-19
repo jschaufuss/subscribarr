@@ -111,7 +111,7 @@
         {% if movie4k_subs %}
         <div class="subscription-list">
             {% for sub in movie4k_subs %}
-            <div class="subscription-item" data-kind="movie4k" data-tmdb-id="{{ sub.tmdb_id }}" data-title="{{ sub.title|default:'(unknown)'|escape }}" data-poster="{{ sub.poster|default:'' }}">
+        <div class="subscription-item" data-kind="movie4k" data-tmdb-id="{{ sub.tmdb_id }}" data-title="{{ sub.title|default:'(unknown)'|escape }}" data-poster="{{ sub.poster|default:'' }}" data-overview="{{ sub.overview|default:''|escape }}">
                 {% if sub.poster %}
                 <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
                 {% else %}
@@ -121,6 +121,9 @@
                     <div class="subscription-title">{{ sub.title|default:"(unknown)" }}</div>
                     <div class="subscription-date">TMDB: {{ sub.tmdb_id }}</div>
                     <div class="subscription-date">Subscribed on {{ sub.created_at|date:"d.m.Y" }}</div>
+            {% if sub.overview %}
+            <div class="subscription-overview">{{ sub.overview|truncatechars:100 }}</div>
+            {% endif %}
                 </div>
             </div>
             {% endfor %}

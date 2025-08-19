@@ -106,18 +106,25 @@ def profile(request):
                     sub.save(update_fields=['poster', 'overview', 'genres'])
     # Movies 4K
         for sub in movie4k_subs:
-            if not sub.poster and getattr(sub, 'tmdb_id', None):
+            details = None
+            try:
+                if radarr_conf and getattr(sub, 'tmdb_id', None):
+                    details = radarr_lookup_movie_by_tmdb_id(sub.tmdb_id, base_url=radarr_conf[0], api_key=radarr_conf[1])
+            except Exception:
                 details = None
-                try:
-                    if radarr_conf:
-                        details = radarr_lookup_movie_by_tmdb_id(sub.tmdb_id, base_url=radarr_conf[0], api_key=radarr_conf[1])
-                except Exception:
-                    details = None
-                if details and details.get('poster'):
+            if details:
+                # Always attach overview transiently for display (model has no field)
+                sub.overview = details.get('overview') or ''
+                # Persist poster/title if missing
+                fields = []
+                if not sub.poster and details.get('poster'):
                     sub.poster = details['poster']
-                    if not sub.title:
-                        sub.title = details.get('title') or sub.title
-                    sub.save(update_fields=['poster', 'title'])
+                    fields.append('poster')
+                if (not sub.title) and details.get('title'):
+                    sub.title = details.get('title')
+                    fields.append('title')
+                if fields:
+                    sub.save(update_fields=fields)
     except Exception:
         # still show page even if lookups fail
         pass
