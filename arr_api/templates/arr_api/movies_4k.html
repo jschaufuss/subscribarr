@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="{% static 'css/index.css' %}">
 <style>
 .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+/* Constrain content matching other pages */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .card { position: relative; background: var(--card-bg, #111); border: 1px solid var(--border, #333); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; }
 .card img { width: 100%; height: 320px; object-fit: cover; background: #222; }
 .card .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -16,16 +18,32 @@
 .card .badge { position: absolute; left: 8px; top: 8px; background: #1c7d32; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.08); }
 .btn { padding: 6px 10px; border: 1px solid var(--border, #333); background: var(--btn-bg, #1e1e1e); color: #fff; border-radius: 6px; cursor: pointer; }
 .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
-.toolbar { display: flex; gap: 8px; align-items: center; margin: 8px 0 16px; }
-.toolbar form { display: flex; gap: 8px; align-items: center; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-accent:hover { filter: brightness(1.1); }
+.toolbar { display: flex; gap: 8px; align-items: center; margin: 8px 0 16px; flex-wrap: wrap; }
+.toolbar form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
 .pager { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
-.pager .muted { margin: 0 8px; }
+.pager .muted { margin: 0 8px; white-space: nowrap; }
 /* Modal uses main page styles from index.css */
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  /* Prevent horizontal overflow from toolbar */
+  .toolbar { justify-content: flex-start !important; }
+  .toolbar-form { width: 100%; display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .toolbar-form input[type="text"],
+  .toolbar-form select,
+  .toolbar-form .btn.apply { width: 100% !important; min-width: 0 !important; }
+  .pager { width: 100%; margin: 0 !important; justify-content: center; flex-wrap: nowrap; }
+  .pager .btn { width: auto; padding: 8px 10px; }
+  .grid-cards { grid-template-columns: 1fr; gap: 12px; }
+  .card img { height: 260px; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page">
+<div class="wrap">
   <h1>4K</h1>
   <p class="muted">Movies known across your Radarr instances that currently do not have a 4K file anywhere. Subscribe to get notified once 4K appears on any instance.</p>
   <div class="toolbar" style="justify-content: flex-end;">
@@ -38,7 +56,7 @@
         <option value="all" {% if pp_is_all %}selected{% endif %}>All</option>
       </select>
       <input type="hidden" name="page" value="{{ page }}">
-      <button type="submit" class="btn">Apply</button>
+  <button type="submit" class="btn btn-accent apply">Apply</button>
       <div class="pager" style="margin:0 0 0 8px;">
         {% if has_prev %}
           <a class="btn" href="?page={{ prev_page }}&pp={{ pp }}{% if q %}&q={{ q|urlencode }}{% endif %}">Prev</a>
@@ -63,10 +81,7 @@
       <div class="body">
         <div class="title">{{ it.title }}{% if it.year %} ({{ it.year }}){% endif %}</div>
         {% if it.overview %}<div class="muted">{{ it.overview|truncatewords:30 }}</div>{% endif %}
-        <div class="actions">
-          <button class="btn btn-unsubscribe" {% if not it.is_subscribed_4k %}style="display:none"{% endif %}>Unsubscribe</button>
-          <button class="btn btn-subscribe" {% if it.is_subscribed_4k %}style="display:none"{% endif %}>Subscribe to 4K</button>
-        </div>
+  <div class="actions" style="display:none"></div>
       </div>
     </div>
     {% endfor %}
@@ -143,7 +158,7 @@
 
   document.querySelectorAll('.grid-cards .card').forEach(card => {
     card.addEventListener('click', (e) => {
-      if (e.target && (e.target.classList.contains('btn') || e.target.closest('.actions'))) return;
+  if (e.target && (e.target.classList.contains('btn') || e.target.closest('.actions'))) return;
       lastCard = card;
       const title = card.dataset.title || '';
       const poster = card.dataset.poster || '';
@@ -154,47 +169,11 @@
       mOverview.textContent = overview || '';
       mBadges.innerHTML = '';
       mSub.textContent = '';
-      applySubUI(card, card.dataset.subscribed === '1');
+  applySubUI(card, card.dataset.subscribed === '1');
       openModal();
     });
   });
-  document.querySelectorAll('.card .btn-subscribe').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const root = btn.closest('.card');
-      const tmdb = root?.dataset?.tmdb;
-      if(!tmdb) return;
-      // Call subscribe endpoint
-      btn.disabled = true;
-      const ok = await post(`/api/movies4k/subscribe/${tmdb}/`);
-      if(!ok){ btn.disabled = false; return; }
-      // Toggle UI to subscribed
-      root.dataset.subscribed = '1';
-      // Buttons
-      btn.style.display = 'none';
-      const unbtn = root.querySelector('.btn-unsubscribe');
-      if(unbtn) unbtn.style.display = '';
-      root.classList.add('subscribed');
-      if (lastCard === root) applySubUI(root, true);
-    });
-  });
-  document.querySelectorAll('.card .btn-unsubscribe').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const root = btn.closest('.card');
-      const tmdb = root?.dataset?.tmdb;
-      if(!tmdb) return;
-      btn.disabled = true;
-      const ok = await post(`/api/movies4k/unsubscribe/${tmdb}/`);
-      if(!ok){ btn.disabled = false; return; }
-      // Toggle UI to unsubscribed
-      root.dataset.subscribed = '0';
-      btn.style.display = 'none';
-      const subbtn = root.querySelector('.btn-subscribe');
-      if(subbtn){ subbtn.disabled = false; subbtn.style.display = ''; }
-      root.classList.remove('subscribed');
-      if (lastCard === root) applySubUI(root, false);
-    });
-  });
+  // Card-level subscribe/unsubscribe buttons removed; actions handled in modal
 
   // Modal subscribe button mirrors card state
   if (subscribeBtn) {
