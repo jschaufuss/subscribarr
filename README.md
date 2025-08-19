@@ -1,3 +1,9 @@
+<div align="center" style="border:1px solid #e33;padding:10px;border-radius:6px;margin:10px 0;">
+  <strong>Disclaimer</strong><br/>
+  This project was largely written with GitHub Copilot. I apologize to all developers out there - there was no such software out there - and I’m looking for a competent maintainer.
+  If multiple users rely on it and no maintainer steps up, I’ll level up my Django skills and take it over myself.
+</div>
+
 <p align="center">
   <img src="./static/images/logo.png" alt="Subscribarr" width="450" height="150" />
 </p>
@@ -22,15 +28,20 @@
 Lightweight web UI for Sonarr/Radarr subscriptions with Jellyfin login, calendar, and flexible notifications via Email, ntfy, and Apprise.
 
 ## Features
-- Sign in with Jellyfin (no separate user store)
+- Sign in with Jellyfin
 - Sonarr/Radarr‑style calendar (upcoming episodes/movies)
 - Subscribe/unsubscribe from the UI (series & movies)
-- Admin overview of all users’ subscriptions with posters
+- Admin overview of all users subscriptions
 - Per‑user notification channels:
   - Email (SMTP)
   - ntfy (Bearer token or Basic Auth)
   - Apprise (Discord, Gotify, Pushover, Webhooks, and many more)
-- Docker‑ready; environment‑driven security (ALLOWED_HOSTS, CSRF, proxy)
+- Docker‑ready
+- Multiple Sonarr/Radarr instances
+- Early‑availability notifications (configurable lookahead)
+- Duplicate suppression per user/item/day and admin tooling (send test, reset tokens)
+- 4K subscriptions: detection across all Radarr instances
+- YouTube subscriptions
 
 ## Screenshots
 <p align="center">
