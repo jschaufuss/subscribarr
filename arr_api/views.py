@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from settingspanel.models import AppSettings, ArrInstance
-from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, jellyfin_has_movie_by_tmdb, tmdb_is_available_any_instance
+from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, tmdb_is_available_any_instance
 from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
 

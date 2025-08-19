@@ -8,7 +8,6 @@ from django.core.cache import cache
 import hashlib
 import json
 from django.core.cache import cache
-from settingspanel.models import AppSettings
 
 # ENV-Fallbacks
 ENV_SONARR_URL = os.getenv("SONARR_URL", "")
@@ -20,7 +19,6 @@ M4K_LIST_TTL = int(os.getenv("ARR_4K_LIST_TTL", "180"))  # seconds
 RADARR_LIST_TTL = int(os.getenv("ARR_RADARR_LIST_TTL", "300"))
 HAS4K_TTL = int(os.getenv("ARR_HAS4K_TTL", "300"))
 LOOKUP_TTL = int(os.getenv("ARR_LOOKUP_TTL", "300"))
-JF_CHECK_TTL = int(os.getenv("JELLYFIN_CHECK_TTL", "600"))
 MOVIE_AVAIL_TTL = int(os.getenv("ARR_MOVIE_AVAIL_TTL", "300"))
 
 class ArrServiceError(Exception):
@@ -388,79 +386,7 @@ def tmdb_has_4k_any_instance(tmdb_id: int) -> bool:
     return False
 
 
-def jellyfin_has_movie_by_tmdb(tmdb_id: int) -> bool:
-    """Return True if Jellyfin library already contains a movie with this TMDB id.
-    Uses AppSettings jellyfin_server_url + jellyfin_api_key. Caches for JF_CHECK_TTL seconds.
-    Robustness: verifies ProviderIds to avoid false-positives if the server ignores AnyProviderIdEquals.
-    """
-    if not tmdb_id:
-        return False
-    cache_key = f"jf:has_tmdb:{int(tmdb_id)}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return bool(cached)
-    try:
-        cfg = AppSettings.current()
-        base = (cfg.get_jellyfin_url() or '').strip()
-        key = (cfg.jellyfin_api_key or '').strip()
-        if not base or not key:
-            cache.set(cache_key, False, JF_CHECK_TTL)
-            return False
-        url = f"{base}/Items"
-        # Try both provider id casings seen in Jellyfin
-        variants = [f"Tmdb:{int(tmdb_id)}", f"tmdb:{int(tmdb_id)}"]
-        ok = False
-        headers = {'X-Emby-Token': key, 'X-MediaBrowser-Token': key, 'Accept': 'application/json'}
-        for any_id in variants:
-            params = {
-                'IncludeItemTypes': 'Movie',
-                'Recursive': 'true',
-                'AnyProviderIdEquals': any_id,
-                'Limit': 5,
-                'Fields': 'ProviderIds',
-            }
-            resp = requests.get(url, params=params, headers=headers, timeout=6)
-            if resp.status_code != 200:
-                continue
-            try:
-                data = resp.json() or {}
-            except ValueError:
-                continue
-            items = data.get('Items') or data.get('items') or []
-            # Verify ProviderIds actually match the requested TMDB id to avoid over-filtering
-            for it in items:
-                pids = it.get('ProviderIds') or it.get('providerIds') or {}
-                if str(pids.get('Tmdb') or pids.get('tmdb') or '') == str(int(tmdb_id)):
-                    ok = True
-                    break
-            if ok:
-                break
-        # Fallback: some servers ignore AnyProviderIdEquals; try a search by term and verify ProviderIds
-        if not ok:
-            sparams = {
-                'IncludeItemTypes': 'Movie',
-                'Recursive': 'true',
-                'SearchTerm': str(int(tmdb_id)),
-                'Limit': 10,
-                'Fields': 'ProviderIds',
-            }
-            resp = requests.get(url, params=sparams, headers=headers, timeout=6)
-            if resp.status_code == 200:
-                try:
-                    data = resp.json() or {}
-                    items = data.get('Items') or data.get('items') or []
-                    for it in items:
-                        pids = it.get('ProviderIds') or it.get('providerIds') or {}
-                        if str(pids.get('Tmdb') or pids.get('tmdb') or '') == str(int(tmdb_id)):
-                            ok = True
-                            break
-                except ValueError:
-                    pass
-        cache.set(cache_key, ok, JF_CHECK_TTL)
-        return ok
-    except Exception:
-        cache.set(cache_key, False, JF_CHECK_TTL)
-        return False
+# Jellyfin availability helper removed; Jellyfin is used for SSO only.
 
 def _movie_is_available_in_instance(base_url: str, api_key: str, movie_id: int) -> bool:
     """Check if a Radarr movie has an available file in this instance."""
