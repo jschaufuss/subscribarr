@@ -1,8 +1,5 @@
-<div align="center" style="border:1px solid #e33;padding:10px;border-radius:6px;margin:10px 0;">
-  <strong>Disclaimer</strong><br/>
-  This project was largely written with GitHub Copilot. I apologize to all developers out there - there was no such software out there - and I’m looking for a competent maintainer.
-  If multiple users rely on it and no maintainer steps up, I’ll level up my Django skills and take it over myself.
-</div>
+> [!WARNING] 
+> This project was largely written with GitHub Copilot. I apologize to all developers out there for using GitHub Copilot. I’m looking for a competent maintainer. If multiple users rely on it and no maintainer steps up, I’ll level up my Django skills and take it over myself.
 
 <p align="center">
   <img src="./static/images/logo.png" alt="Subscribarr" width="450" height="150" />
