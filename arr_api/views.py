@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from settingspanel.models import AppSettings, ArrInstance
-from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, tmdb_is_available_any_instance
+from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, tmdb_is_available_any_instance, sonarr_calendar_cached, radarr_calendar_cached
 from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
 
@@ -70,13 +70,13 @@ class ArrIndexView(View):
         for inst in _arr_instances():
             if inst.kind == "sonarr":
                 try:
-                    eps.extend(sonarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
-                except ArrServiceError as e:
+                    eps.extend(sonarr_calendar_cached(inst, days))
+                except Exception as e:
                     messages.error(request, f"Sonarr ({inst.name}) is not reachable: {e}")
             elif inst.kind == "radarr":
                 try:
-                    movies.extend(radarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
-                except ArrServiceError as e:
+                    movies.extend(radarr_calendar_cached(inst, days))
+                except Exception as e:
                     messages.error(request, f"Radarr ({inst.name}) is not reachable: {e}")
 
         # Suche
@@ -162,13 +162,13 @@ class CalendarEventsApi(APIView):
         for inst in _arr_instances():
             if inst.kind == "sonarr":
                 try:
-                    eps.extend(sonarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
-                except ArrServiceError:
+                    eps.extend(sonarr_calendar_cached(inst, days))
+                except Exception:
                     pass
             elif inst.kind == "radarr":
                 try:
-                    movies.extend(radarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key))
-                except ArrServiceError:
+                    movies.extend(radarr_calendar_cached(inst, days))
+                except Exception:
                     pass
 
         series_sub = set(SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True))

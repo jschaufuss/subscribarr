@@ -20,6 +20,7 @@ RADARR_LIST_TTL = int(os.getenv("ARR_RADARR_LIST_TTL", "300"))
 HAS4K_TTL = int(os.getenv("ARR_HAS4K_TTL", "300"))
 LOOKUP_TTL = int(os.getenv("ARR_LOOKUP_TTL", "300"))
 MOVIE_AVAIL_TTL = int(os.getenv("ARR_MOVIE_AVAIL_TTL", "300"))
+CAL_TTL = int(os.getenv("ARR_CAL_TTL", "120"))
 
 class ArrServiceError(Exception):
     pass
@@ -146,6 +147,38 @@ def radarr_calendar(days: int | None = None, base_url: str | None = None, api_ke
         return False
 
     return [m for m in out if is_upcoming(m)]
+
+
+def sonarr_calendar_cached(inst: ArrInstance, days: int) -> list[dict]:
+    """Cached Sonarr calendar per instance and days."""
+    if not inst or inst.kind != 'sonarr':
+        return []
+    key = f"arr:cal:v1:sonarr:{inst.id}:{int(days)}"
+    data = cache.get(key)
+    if data is not None:
+        return data
+    try:
+        data = sonarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key) or []
+    except Exception:
+        data = []
+    cache.set(key, data, CAL_TTL)
+    return data
+
+
+def radarr_calendar_cached(inst: ArrInstance, days: int) -> list[dict]:
+    """Cached Radarr calendar per instance and days."""
+    if not inst or inst.kind != 'radarr':
+        return []
+    key = f"arr:cal:v1:radarr:{inst.id}:{int(days)}"
+    data = cache.get(key)
+    if data is not None:
+        return data
+    try:
+        data = radarr_calendar(days=days, base_url=inst.base_url, api_key=inst.api_key) or []
+    except Exception:
+        data = []
+    cache.set(key, data, CAL_TTL)
+    return data
 
 def sonarr_get_series(series_id: int, base_url: str | None = None, api_key: str | None = None) -> dict | None:
     """Fetch a single series by id from Sonarr, return dict with title, overview, poster and genres."""
