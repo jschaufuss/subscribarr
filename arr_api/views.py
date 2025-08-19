@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from settingspanel.models import AppSettings, ArrInstance
-from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id
+from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, jellyfin_has_movie_by_tmdb, tmdb_is_available_any_instance
 from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
 
@@ -121,6 +121,17 @@ class ArrIndexView(View):
             g["is_subscribed"] = g["seriesId"] in subscribed_series_ids
             series_grouped.append(g)
 
+        # Filter: hide movies already available (downloaded) in any configured Radarr instance by tmdbId
+        def avail_filter(m):
+            try:
+                tid = int(m.get('tmdbId') or 0)
+            except Exception:
+                tid = 0
+            if not tid:
+                return True
+            return not tmdb_is_available_any_instance(tid)
+        movies = [m for m in movies if avail_filter(m)]
+
         # Markiere abonnierte Filme
         for movie in movies:
             movie["is_subscribed"] = movie.get("movieId") in subscribed_movie_ids
@@ -187,6 +198,13 @@ class CalendarEventsApi(APIView):
             })
 
         for m in movies:
+            # Skip movies already available (downloaded) in any Radarr instance (by tmdbId)
+            try:
+                tid = int(m.get('tmdbId') or 0)
+            except Exception:
+                tid = 0
+            if tid and tmdb_is_available_any_instance(tid):
+                continue
             when = m.get('digitalRelease') or m.get('physicalRelease') or m.get('inCinemas')
             if not when:
                 continue
