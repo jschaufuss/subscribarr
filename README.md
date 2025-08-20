@@ -41,14 +41,30 @@ Lightweight web UI for Sonarr/Radarr subscriptions with Jellyfin login, calendar
 - YouTube subscriptions
 
 ## Screenshots
-<p align="center">
-  <img src="./screenshots/SCR-20250811-lfrm.png" alt="Settings" width="800"><br/>
-  <img src="./screenshots/SCR-20250811-lfvc.png" alt="Subscriptions" width="800"><br/>
-  <img src="./screenshots/SCR-20250811-lfod.png" alt="Overview" width="800"><br/>
-  <img src="./screenshots/SCR-20250811-lfyq.png" alt="Search" width="800"><br/>
-  <img src="./screenshots/SCR-20250811-lgau.png" alt="Details" width="800"><br/>
-  <img src="./screenshots/SCR-20250811-lgcz.png" alt="Notifications" width="800">
-</p>
+
+<div align="center">
+
+| Release Overview | 4K Movies Section | YouTube Section |
+|:----------------:|:------------------:|:---------------:|
+| <img src="./screenshots/250821_00h48m27s_screenshot.png" alt="Release Overview" width="300"> | <img src="./screenshots/250821_00h49m00s_screenshot.png" alt="4K Movies" width="300"> | <img src="./screenshots/250821_00h49m10s_screenshot.png" alt="YouTube Subscriptions" width="300"> |
+| Main release overview page | 4K movie management | YouTube subscription management |
+
+| Calendar Month View | Calendar Week View | Calendar List View |
+|:-------------------:|:------------------:|:------------------:|
+| <img src="./screenshots/250821_00h49m23s_screenshot.png" alt="Calendar Month" width="300"> | <img src="./screenshots/250821_00h49m37s_screenshot.png" alt="Calendar Week" width="300"> | <img src="./screenshots/250821_00h49m50s_screenshot.png" alt="Calendar List" width="300"> |
+| Monthly calendar view | Weekly calendar view | List view of releases |
+
+| Administration Panel | Additional Admin Features | Profile Settings |
+|:-------------------:|:------------------------:|:----------------:|
+| <img src="./screenshots/250821_00h50m02s_screenshot.png" alt="Administration" width="300"> | <img src="./screenshots/250821_00h50m17s_screenshot.png" alt="Admin Features" width="300"> | <img src="./screenshots/250821_00h50m33s_screenshot.png" alt="Profile Settings" width="300"> |
+| Main administration panel | Additional admin tools | User profile settings |
+
+| User Profile | User Subscription Management | User Subscription Details |
+|:------------:|:---------------------------:|:-------------------------:|
+| <img src="./screenshots/250821_00h50m40s_screenshot.png" alt="User Profile" width="300"> | <img src="./screenshots/250821_00h50m55s_screenshot.png" alt="User Subscriptions" width="300"> | <img src="./screenshots/250821_00h51m05s_screenshot.png" alt="Subscription Details" width="300"> |
+| User profile configuration | Managing user subscriptions | Detailed subscription view |
+
+</div>
 
 ## Quickstart (Docker Compose)
 
