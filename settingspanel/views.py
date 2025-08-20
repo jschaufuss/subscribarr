@@ -13,8 +13,8 @@ from .forms import (
 from .models import AppSettings, ArrInstance
 from django.http import JsonResponse
 from accounts.utils import jellyfin_admin_required
-from arr_api.models import SeriesSubscription, MovieSubscription
-from arr_api.models import SentNotification
+from arr_api.models import SeriesSubscription, MovieSubscription, Movie4KSubscription, SentNotification
+from youtube.models import YouTubeSubscription
 from django.db.models import Count
 import requests
 from django.core.mail import send_mail
@@ -295,10 +295,14 @@ class SettingsView(View):
 def subscriptions_overview(request):
     series = SeriesSubscription.objects.select_related('user').order_by('user__username', 'series_title')
     movies = MovieSubscription.objects.select_related('user').order_by('user__username', 'title')
+    movies_4k = Movie4KSubscription.objects.select_related('user').order_by('user__username', 'title')
+    youtube_subs = YouTubeSubscription.objects.select_related('user').order_by('user__username', 'title')
 
     # Aggregate counts per user
     s_counts = SeriesSubscription.objects.values('user_id', 'user__username').annotate(series_count=Count('id'))
     m_counts = MovieSubscription.objects.values('user_id', 'user__username').annotate(movie_count=Count('id'))
+    m4k_counts = Movie4KSubscription.objects.values('user_id', 'user__username').annotate(movie4k_count=Count('id'))
+    yt_counts = YouTubeSubscription.objects.values('user_id', 'user__username').annotate(youtube_count=Count('id'))
 
     user_map = {}
     for row in s_counts:
@@ -308,6 +312,8 @@ def subscriptions_overview(request):
             'username': row['user__username'],
             'series_count': 0,
             'movie_count': 0,
+            'movie4k_count': 0,
+            'youtube_count': 0,
         })
         user_map[key]['series_count'] = row['series_count']
     for row in m_counts:
@@ -317,18 +323,44 @@ def subscriptions_overview(request):
             'username': row['user__username'],
             'series_count': 0,
             'movie_count': 0,
+            'movie4k_count': 0,
+            'youtube_count': 0,
         })
         user_map[key]['movie_count'] = row['movie_count']
+    for row in m4k_counts:
+        key = row['user_id']
+        user_map.setdefault(key, {
+            'user_id': key,
+            'username': row['user__username'],
+            'series_count': 0,
+            'movie_count': 0,
+            'movie4k_count': 0,
+            'youtube_count': 0,
+        })
+        user_map[key]['movie4k_count'] = row['movie4k_count']
+    for row in yt_counts:
+        key = row['user_id']
+        user_map.setdefault(key, {
+            'user_id': key,
+            'username': row['user__username'],
+            'series_count': 0,
+            'movie_count': 0,
+            'movie4k_count': 0,
+            'youtube_count': 0,
+        })
+        user_map[key]['youtube_count'] = row['youtube_count']
 
     user_stats = []
     for key, val in user_map.items():
-        total = (val.get('series_count') or 0) + (val.get('movie_count') or 0)
+        total = (val.get('series_count') or 0) + (val.get('movie_count') or 0) + (val.get('movie4k_count') or 0) + (val.get('youtube_count') or 0)
         user_stats.append({
             'user_id': val['user_id'],
             'username': val['username'],
             'username_lower': (val['username'] or '').lower(),
             'series_count': val.get('series_count') or 0,
             'movie_count': val.get('movie_count') or 0,
+            'movie4k_count': val.get('movie4k_count') or 0,
+            'youtube_count': val.get('youtube_count') or 0,
             'total_count': total,
         })
     user_stats.sort(key=lambda x: (-x['total_count'], x['username'].lower()))
@@ -336,5 +368,7 @@ def subscriptions_overview(request):
     return render(request, 'settingspanel/subscriptions.html', {
         'series': series,
         'movies': movies,
+        'movies_4k': movies_4k,
+        'youtube_subs': youtube_subs,
         'user_stats': user_stats,
     })
