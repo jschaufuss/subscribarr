@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Setup – Subscribarr{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_style %}{% endblock %}
+</head>
+
+<body class="setup-page">
+    <nav class="main-nav">
+        <div class="nav-content">
+            <a href="/" class="nav-brand">
+                <img src="{% static 'images/logo.png' %}" alt="Subscribarr" class="nav-logo" height="50px">
+            </a>
+        </div>
+    </nav>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+
+</html>

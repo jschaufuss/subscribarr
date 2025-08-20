@@ -114,58 +114,163 @@ def fetch_feed_entries(feed_url: str, timeout: int = 10) -> list[dict]:
     return entries
 
 
-def _http_get(url: str, timeout: int = 8) -> str | None:
+def _http_get(url: str, timeout: int = 10) -> str | None:
     try:
-        r = requests.get(
-            url,
-            timeout=timeout,
-            headers={
-                'User-Agent': 'Subscribarr/YouTube',
-                'Accept-Language': 'en-US,en;q=0.8',
-            }
-        )
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, deflate',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+        }
+        r = requests.get(url, timeout=timeout, headers=headers, allow_redirects=True)
         r.raise_for_status()
         return r.text
-    except requests.RequestException:
-        return None
+    except requests.RequestException as e:
+        # Try with different user agent if first request fails
+        try:
+            headers['User-Agent'] = 'Subscribarr/YouTube (+https://github.com/subscribarr)'
+            r = requests.get(url, timeout=timeout//2, headers=headers, allow_redirects=True)
+            r.raise_for_status()
+            return r.text
+        except requests.RequestException:
+            return None
 
 
 def _parse_og(html: str) -> dict:
-    # Very small regex-based OG parser
+    # Enhanced OG parser with better YouTube-specific extraction
     meta = {}
     if not html:
         return meta
-    # property="og:*"
-    for prop in ("og:title", "og:image", "og:url"):
-        m = re.search(r'<meta[^>]+property=["\']%s["\'][^>]+content=["\']([^"\']+)["\']' % re.escape(prop), html, flags=re.I)
+    
+    # Standard OG tags
+    for prop in ("og:title", "og:image", "og:url", "og:description"):
+        # Try both property and name attributes
+        patterns = [
+            r'<meta[^>]+property=["\']%s["\'][^>]+content=["\']([^"\']+)["\']' % re.escape(prop),
+            r'<meta[^>]+name=["\']%s["\'][^>]+content=["\']([^"\']+)["\']' % re.escape(prop),
+            r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']%s["\']' % re.escape(prop),
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, html, flags=re.I)
+            if m:
+                meta[prop] = m.group(1)
+                break
+    
+    # Twitter card fallbacks
+    if 'og:title' not in meta:
+        m = re.search(r'<meta[^>]+name=["\']twitter:title["\'][^>]+content=["\']([^"\']+)["\']', html, flags=re.I)
         if m:
-            meta[prop] = m.group(1)
+            meta['og:title'] = m.group(1)
+    
+    if 'og:image' not in meta:
+        m = re.search(r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']', html, flags=re.I)
+        if m:
+            meta['og:image'] = m.group(1)
+    
     # itemprop="image"
     if 'og:image' not in meta:
         m = re.search(r'<meta[^>]+itemprop=["\']image["\'][^>]+content=["\']([^"\']+)["\']', html, flags=re.I)
         if m:
             meta['og:image'] = m.group(1)
+    
     # <link rel="image_src" href="...">
     if 'og:image' not in meta:
         m = re.search(r'<link[^>]+rel=["\']image_src["\'][^>]+href=["\']([^"\']+)["\']', html, flags=re.I)
         if m:
             meta['og:image'] = m.group(1)
-    # Attempt to find avatar thumbnails array in inline JSON
+    
+    # Page title fallback
+    if 'og:title' not in meta:
+        m = re.search(r'<title[^>]*>([^<]+)</title>', html, flags=re.I)
+        if m:
+            title = m.group(1).strip()
+            # Clean up YouTube title suffixes
+            title = re.sub(r'\s*-\s*YouTube\s*$', '', title, flags=re.I)
+            meta['og:title'] = title
+    
+    # YouTube-specific JSON data extraction
+    if 'og:image' not in meta or 'og:title' not in meta:
+        # Try to extract from ytInitialData or similar
+        json_patterns = [
+            r'var ytInitialData = ({.+?});',
+            r'"ytInitialData"\s*:\s*({.+?}),',
+            r'window\["ytInitialData"\]\s*=\s*({.+?});'
+        ]
+        
+        for pattern in json_patterns:
+            m = re.search(pattern, html, flags=re.S)
+            if m:
+                try:
+                    import json
+                    data = json.loads(m.group(1))
+                    
+                    # Extract channel/playlist title and avatar
+                    if 'og:title' not in meta:
+                        # Try various paths for title
+                        title_paths = [
+                            ['metadata', 'channelMetadataRenderer', 'title'],
+                            ['header', 'c4TabbedHeaderRenderer', 'title'],
+                            ['header', 'pageHeaderRenderer', 'pageTitle'],
+                            ['microformat', 'microformatDataRenderer', 'title'],
+                        ]
+                        for path in title_paths:
+                            try:
+                                temp = data
+                                for key in path:
+                                    temp = temp[key]
+                                if isinstance(temp, str) and temp.strip():
+                                    meta['og:title'] = temp.strip()
+                                    break
+                            except (KeyError, TypeError):
+                                continue
+                    
+                    # Extract avatar/thumbnail
+                    if 'og:image' not in meta:
+                        thumbnail_paths = [
+                            ['metadata', 'channelMetadataRenderer', 'avatar', 'thumbnails'],
+                            ['header', 'c4TabbedHeaderRenderer', 'avatar', 'thumbnails'],
+                            ['microformat', 'microformatDataRenderer', 'thumbnail', 'thumbnails'],
+                        ]
+                        for path in thumbnail_paths:
+                            try:
+                                temp = data
+                                for key in path:
+                                    temp = temp[key]
+                                if isinstance(temp, list) and temp:
+                                    # Get highest resolution thumbnail
+                                    best_thumb = max(temp, key=lambda x: x.get('width', 0) * x.get('height', 0))
+                                    if 'url' in best_thumb:
+                                        meta['og:image'] = best_thumb['url']
+                                        break
+                            except (KeyError, TypeError):
+                                continue
+                    
+                    if 'og:title' in meta and 'og:image' in meta:
+                        break
+                        
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    continue
+    
+    # Attempt to find avatar thumbnails array in inline JSON (legacy method)
     if 'og:image' not in meta:
         # c4TabbedHeaderRenderer path (channel pages)
         m = re.search(r'c4TabbedHeaderRenderer"\s*:\s*\{.*?"avatar"\s*:\s*\{\s*"thumbnails"\s*:\s*\[(.*?)\]', html, flags=re.I|re.S)
         if m:
-            # find last url in thumbnails list
+            # find highest resolution url in thumbnails list
             urls = re.findall(r'"url"\s*:\s*"(https:[^"\\]+)"', m.group(1))
             if urls:
-                meta['og:image'] = urls[-1]
-    # Fallback: any yt3.ggpht.com url on page (prefer largest sN)
+                meta['og:image'] = urls[-1]  # Usually highest res is last
+    
+    # Fallback: any yt3.ggpht.com url on page (prefer largest)
     if 'og:image' not in meta:
         urls = re.findall(r'(https://yt3\.ggpht\.com/[a-zA-Z0-9_\-~=%\.]+)', html)
         if urls:
             # Heuristic: pick the longest url (often higher res variants)
-            urls_sorted = sorted(urls, key=len, reverse=True)
+            urls_sorted = sorted(set(urls), key=len, reverse=True)
             meta['og:image'] = urls_sorted[0]
+    
     return meta
 
 
@@ -178,33 +283,108 @@ def get_youtube_metadata(kind: str, target_id: str) -> dict:
     tid = (target_id or '').strip()
     if not tid:
         return {}
+    
+    # Resolve handle to channel ID if needed
+    original_tid = tid
     if kind == 'channel' and (tid.startswith('@') or tid.startswith('/@')):
         cid = _resolve_handle_to_channel_id(tid)
         if cid:
             tid = cid
+    
+    # Try multiple URL formats for better success rate
+    urls_to_try = []
     if kind == 'channel':
-        page_url = f'https://www.youtube.com/channel/{tid}' if tid.startswith('UC') else f'https://www.youtube.com/{tid.lstrip("/")}'
-    else:
-        page_url = f'https://www.youtube.com/playlist?list={tid}'
-    # stabilize markup language
-    if '?' in page_url:
-        page_url = page_url + '&hl=en'
-    else:
-        page_url = page_url + '?hl=en'
-    html = _http_get(page_url)
-    og = _parse_og(html or '')
-    title = og.get('og:title')
-    image = og.get('og:image')
-    url = og.get('og:url') or page_url
-    # Fallback: try first feed thumbnail if no image
-    if not image:
-        feed = build_feed_url(kind, tid)
-        entries = fetch_feed_entries(feed) if feed else []
-        if entries:
-            # If playlist: first entry thumb approximates cover; for channel: also acceptable fallback
-            image = entries[0].get('thumb') or image
-    return {
-        'title': title,
-        'image': image,
-        'url': url,
-    }
+        if tid.startswith('UC'):
+            urls_to_try = [
+                f'https://www.youtube.com/channel/{tid}',
+                f'https://www.youtube.com/c/{tid}',
+                f'https://www.youtube.com/{tid}'
+            ]
+        elif tid.startswith('@'):
+            urls_to_try = [
+                f'https://www.youtube.com/{tid}',
+                f'https://www.youtube.com/c/{tid.lstrip("@")}',
+                f'https://www.youtube.com/user/{tid.lstrip("@")}'
+            ]
+        else:
+            urls_to_try = [
+                f'https://www.youtube.com/{tid.lstrip("/")}',
+                f'https://www.youtube.com/c/{tid}',
+                f'https://www.youtube.com/user/{tid}',
+                f'https://www.youtube.com/channel/{tid}'
+            ]
+    else:  # playlist
+        urls_to_try = [
+            f'https://www.youtube.com/playlist?list={tid}'
+        ]
+    
+    # Try each URL until we get good metadata
+    best_meta = {}
+    for base_url in urls_to_try:
+        # Add language parameter for consistent markup
+        page_url = base_url + ('&hl=en' if '?' in base_url else '?hl=en')
+        
+        html = _http_get(page_url)
+        if not html:
+            continue
+            
+        og = _parse_og(html)
+        title = og.get('og:title')
+        image = og.get('og:image')
+        url = og.get('og:url') or base_url
+        
+        # Score this result (prefer results with both title and image)
+        score = 0
+        if title and title.strip() and title.lower() not in ['youtube', 'youtube.com']:
+            score += 2
+        if image and image.strip():
+            score += 2
+        
+        # Keep best result so far
+        current_score = 0
+        if best_meta.get('title'):
+            current_score += 2
+        if best_meta.get('image'):
+            current_score += 2
+            
+        if score > current_score:
+            best_meta = {
+                'title': title,
+                'image': image,
+                'url': url,
+            }
+            
+        # If we have both title and image, we're good
+        if score >= 4:
+            break
+    
+    # Fallback: try getting image from feed if we still don't have one
+    if not best_meta.get('image'):
+        try:
+            feed = build_feed_url(kind, tid)
+            entries = fetch_feed_entries(feed) if feed else []
+            if entries:
+                # For playlist: first entry thumb approximates cover
+                # For channel: use channel avatar from feed metadata or first video thumb
+                feed_image = entries[0].get('thumb')
+                if feed_image:
+                    best_meta['image'] = feed_image
+        except Exception:
+            pass
+    
+    # Final fallback: use a generic image based on type
+    if not best_meta.get('image'):
+        if kind == 'channel':
+            best_meta['image'] = 'https://via.placeholder.com/88x88/ff0000/ffffff?text=📺'
+        else:
+            best_meta['image'] = 'https://via.placeholder.com/88x88/cc0000/ffffff?text=📋'
+    
+    # Fallback title if none found
+    if not best_meta.get('title'):
+        best_meta['title'] = f"{kind.title()}: {original_tid}"
+    
+    # Fallback URL
+    if not best_meta.get('url'):
+        best_meta['url'] = urls_to_try[0] if urls_to_try else f'https://www.youtube.com/{original_tid}'
+    
+    return best_meta

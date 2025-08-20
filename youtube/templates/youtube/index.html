@@ -3,6 +3,24 @@
 {% block title %}YouTube Subscriptions{% endblock %}
 {% block extra_style %}
 <link rel="stylesheet" href="{% static 'css/settings.css' %}">
+<style>
+.yt-fallback-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+}
+.yt-channel {
+  background: #cc2020;
+}
+.yt-playlist {
+  background: #881818;
+}
+</style>
 {% endblock %}
 {% block content %}
 <div class="wrap">
@@ -39,18 +57,19 @@
     {% for it in sub_items %}
     {% with s=it.sub m=it.meta %}
     <div class="subscription-item" style="display:flex;gap:10px;background:rgba(0,0,0,.2);padding:10px;border-radius:10px;align-items:center;">
-      <img src="{{ m.image|default:'/static/images/youtube.png' }}" alt="thumb" style="width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000">
+      {% if m.image %}
+      <img src="{{ m.image }}" alt="thumb" style="width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000">
+      {% else %}
+      <div class="yt-fallback-icon {% if s.kind == 'channel' %}yt-channel{% else %}yt-playlist{% endif %}">
+        {% if s.kind == 'channel' %}📺{% else %}📋{% endif %}
+      </div>
+      {% endif %}
       <div style="flex:1;min-width:0;">
         <div class="subscription-title" style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ s.title }}">{{ m.title|default:s.title }}</div>
         <div class="subscription-date" style="font-size:.9rem;color:var(--muted)">{{ s.get_kind_display }} · {{ s.target_id }}</div>
         <div class="subscription-date" style="font-size:.9rem;color:var(--muted)">Subscribed on {{ s.created_at|date:"d.m.Y" }}</div>
       </div>
-      <form method="post" action="{% url 'youtube:unsubscribe' %}" class="inline-form">
-        {% csrf_token %}
-        <input type="hidden" name="kind" value="{{ s.kind }}">
-        <input type="hidden" name="target_id" value="{{ s.target_id }}">
-        <button class="btn">Unsubscribe</button>
-      </form>
+      <button class="btn" onclick="unsubscribeYT('{{ s.kind }}', '{{ s.target_id }}', this)">Unsubscribe</button>
     </div>
     {% endwith %}
     {% endfor %}
@@ -88,6 +107,40 @@
     const r = await fetch("{% url 'youtube:subscribe' %}", { method:'POST', body:fd, headers:{'X-CSRFToken': csrf} });
     const j = await r.json(); if(!j.ok) return alert(j.error||'Error'); location.reload();
   });
+
+  window.unsubscribeYT = async function(kind, target_id, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Removing...';
+    try {
+      const fd = new FormData();
+      fd.append('kind', kind);
+      fd.append('target_id', target_id);
+      const csrf = document.querySelector('#yt-form [name=csrfmiddlewaretoken]')?.value;
+      const r = await fetch("{% url 'youtube:unsubscribe' %}", { 
+        method: 'POST', 
+        body: fd, 
+        headers: {'X-CSRFToken': csrf} 
+      });
+      const j = await r.json();
+      if(!j.ok) {
+        alert(j.error || 'Error unsubscribing');
+        btn.disabled = false;
+        btn.textContent = 'Unsubscribe';
+        return;
+      }
+      // Remove the subscription item from the page
+      btn.closest('.subscription-item').remove();
+      // Check if no subscriptions left
+      const remaining = document.querySelectorAll('.subscription-item').length;
+      if (remaining === 0) {
+        location.reload(); // Reload to show "No YouTube subscriptions yet" message
+      }
+    } catch(e) {
+      alert('Error: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = 'Unsubscribe';
+    }
+  };
 })();
 </script>
 {% endblock %}

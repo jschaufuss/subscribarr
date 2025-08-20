@@ -13,7 +13,11 @@ def index(request):
         meta = {}
         try:
             meta = get_youtube_metadata(s.kind, s.target_id) or {}
-        except Exception:
+            # If we got good metadata, update the stored title if it's better
+            if meta.get('title') and (not s.title or s.title == s.target_id or len(meta['title']) > len(s.title)):
+                s.title = meta['title']
+                s.save(update_fields=['title'])
+        except Exception as e:
             meta = {}
         items.append({'sub': s, 'meta': meta})
     return render(request, 'youtube/index.html', { 'subs': subs, 'sub_items': items })

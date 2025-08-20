@@ -80,24 +80,137 @@ def first_run(request):
     return render(request, 'settingspanel/first_run.html', {'form': form})
 
 
-@jellyfin_admin_required
-def test_connection(request):
-    kind = request.GET.get("kind")  # "sonarr" | "radarr"
+def test_setup_connection(request):
+    """Test connections during setup - no auth required"""
+    if not needs_setup():
+        return JsonResponse({"ok": False, "error": "Setup already completed"}, status=403)
+        
+    kind = request.GET.get("kind", "").strip().lower()  # "sonarr" | "radarr" | "jellyfin"
     url = (request.GET.get("url") or "").strip()
     key = (request.GET.get("key") or "").strip()
-    if kind not in ("sonarr", "radarr"):
+    
+    if kind not in ("sonarr", "radarr", "jellyfin"):
         return JsonResponse({"ok": False, "error": "Invalid type"}, status=400)
     if not url or not key:
         return JsonResponse({"ok": False, "error": "URL and API key required"}, status=400)
 
     try:
-        r = requests.get(
-            f"{url.rstrip('/')}/api/v3/system/status",
-            headers={"X-Api-Key": key},
-            timeout=5
-        )
+        if kind == "jellyfin":
+            # Test Jellyfin connection
+            r = requests.get(
+                f"{url.rstrip('/')}/System/Info",
+                headers={"X-Emby-Token": key},
+                timeout=8
+            )
+        else:
+            # Test Sonarr/Radarr connection
+            r = requests.get(
+                f"{url.rstrip('/')}/api/v3/system/status",
+                headers={"X-Api-Key": key},
+                timeout=5
+            )
+            
         if r.status_code == 200:
-            return JsonResponse({"ok": True})
+            if kind == "jellyfin":
+                try:
+                    data = r.json()
+                    server_name = data.get("ServerName", "Jellyfin Server")
+                    return JsonResponse({"ok": True, "message": f"Connected to {server_name}"})
+                except:
+                    return JsonResponse({"ok": True, "message": "Connected to Jellyfin server"})
+            else:
+                return JsonResponse({"ok": True})
+        return JsonResponse({"ok": False, "error": f"HTTP {r.status_code}"})
+    except requests.RequestException as e:
+        return JsonResponse({"ok": False, "error": str(e)})
+
+
+@jellyfin_admin_required
+def test_connection(request):
+    kind = request.GET.get("kind")  # "sonarr" | "radarr" | "jellyfin"
+    url = (request.GET.get("url") or "").strip()
+    key = (request.GET.get("key") or "").strip()
+    
+    # Allow jellyfin test during setup without auth
+    if kind == "jellyfin" and needs_setup():
+        # Skip auth requirement during setup for jellyfin test
+        pass
+    elif kind not in ("sonarr", "radarr", "jellyfin"):
+        return JsonResponse({"ok": False, "error": "Invalid type"}, status=400)
+        
+    if not url or not key:
+        return JsonResponse({"ok": False, "error": "URL and API key required"}, status=400)
+
+    try:
+        if kind == "jellyfin":
+            # Test Jellyfin connection
+            r = requests.get(
+                f"{url.rstrip('/')}/System/Info",
+                headers={"X-Emby-Token": key},
+                timeout=8
+            )
+        else:
+            # Test Sonarr/Radarr connection
+            r = requests.get(
+                f"{url.rstrip('/')}/api/v3/system/status",
+                headers={"X-Api-Key": key},
+                timeout=5
+            )
+            
+        if r.status_code == 200:
+            if kind == "jellyfin":
+                try:
+                    data = r.json()
+                    server_name = data.get("ServerName", "Jellyfin Server")
+                    return JsonResponse({"ok": True, "message": f"Connected to {server_name}"})
+                except:
+                    return JsonResponse({"ok": True, "message": "Connected to Jellyfin server"})
+            else:
+                return JsonResponse({"ok": True})
+        return JsonResponse({"ok": False, "error": f"HTTP {r.status_code}"})
+    except requests.RequestException as e:
+        return JsonResponse({"ok": False, "error": str(e)})
+def test_connection(request):
+    kind = request.GET.get("kind")  # "sonarr" | "radarr" | "jellyfin"
+    url = (request.GET.get("url") or "").strip()
+    key = (request.GET.get("key") or "").strip()
+    
+    # Allow jellyfin test during setup without auth
+    if kind == "jellyfin" and needs_setup():
+        # Skip auth requirement during setup for jellyfin test
+        pass
+    elif kind not in ("sonarr", "radarr", "jellyfin"):
+        return JsonResponse({"ok": False, "error": "Invalid type"}, status=400)
+        
+    if not url or not key:
+        return JsonResponse({"ok": False, "error": "URL and API key required"}, status=400)
+
+    try:
+        if kind == "jellyfin":
+            # Test Jellyfin connection
+            r = requests.get(
+                f"{url.rstrip('/')}/System/Info",
+                headers={"X-Emby-Token": key},
+                timeout=8
+            )
+        else:
+            # Test Sonarr/Radarr connection
+            r = requests.get(
+                f"{url.rstrip('/')}/api/v3/system/status",
+                headers={"X-Api-Key": key},
+                timeout=5
+            )
+            
+        if r.status_code == 200:
+            if kind == "jellyfin":
+                try:
+                    data = r.json()
+                    server_name = data.get("ServerName", "Jellyfin Server")
+                    return JsonResponse({"ok": True, "message": f"Connected to {server_name}"})
+                except:
+                    return JsonResponse({"ok": True, "message": "Connected to Jellyfin server"})
+            else:
+                return JsonResponse({"ok": True})
         return JsonResponse({"ok": False, "error": f"HTTP {r.status_code}"})
     except requests.RequestException as e:
         return JsonResponse({"ok": False, "error": str(e)})
