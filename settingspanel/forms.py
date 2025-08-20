@@ -1,4 +1,7 @@
 from django import forms
+from urllib.parse import urlparse
+from django.forms import modelformset_factory
+from .models import ArrInstance
 
 WIDE = {"class": "input-wide"}
 
@@ -78,6 +81,10 @@ class NotificationSettingsForm(forms.Form):
         label="Apprise URL(s)", required=False, widget=forms.Textarea(attrs={"rows": 3, "class": "input-wide"}),
         help_text="One per line. See https://github.com/caronc/apprise/wiki for URL formats."
     )
+    notify_lookahead_days = forms.IntegerField(
+        label="Lookahead (days)", required=False, min_value=0, max_value=30,
+        help_text="Consider items up to N days in the future for notifications if file is already available."
+    )
 
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)
@@ -93,28 +100,40 @@ class MailSettingsForm(forms.Form):
     )
     mail_from = forms.EmailField(label="Sender (From)", required=False)
 
-class AccountForm(forms.Form):
-    username = forms.CharField(label="Username", required=False)
-    email = forms.EmailField(label="Email", required=False)
-    new_password = forms.CharField(label="New password", required=False, widget=forms.PasswordInput)
-    repeat_password = forms.CharField(label="Repeat password", required=False, widget=forms.PasswordInput)
+# Account form removed: local account management disabled
 
 
-class NotificationSettingsForm(forms.Form):
-    # ntfy
-    ntfy_server_url = forms.URLField(label="ntfy Server URL", required=False,
-                                     widget=forms.URLInput(attrs=WIDE),
-                                     help_text="e.g. https://ntfy.sh or your self-hosted URL")
-    ntfy_topic_default = forms.CharField(label="Default topic", required=False,
-                                         widget=forms.TextInput(attrs=WIDE))
-    ntfy_user = forms.CharField(label="ntfy Username", required=False,
-                                widget=forms.TextInput(attrs=WIDE))
-    ntfy_password = forms.CharField(label="ntfy Password", required=False,
-                                    widget=forms.PasswordInput(render_value=True, attrs=WIDE))
-    ntfy_token = forms.CharField(label="ntfy Bearer token", required=False,
-                                 widget=forms.PasswordInput(render_value=True, attrs=WIDE))
+class ArrInstanceForm(forms.ModelForm):
+    class Meta:
+        model = ArrInstance
+        fields = ["kind", "name", "base_url", "api_key", "enabled", "order"]
+        widgets = {
+            "kind": forms.Select(attrs=WIDE),
+            "name": forms.TextInput(attrs=WIDE),
+            "base_url": forms.URLInput(attrs=WIDE),
+            "api_key": forms.PasswordInput(render_value=True, attrs=WIDE),
+            "order": forms.NumberInput(attrs={"min": 0, **WIDE}),
+        }
 
-    # Apprise
-    apprise_default_url = forms.CharField(label="Apprise URL(s)", required=False,
-                                          widget=forms.Textarea(attrs={"rows": 3, **WIDE}),
-                                          help_text="One URL per line. Will be used in addition to any user-provided URLs.")
+    def clean_base_url(self):
+        url = (self.cleaned_data.get("base_url") or "").strip()
+        # Basic parse to inspect path parts
+        try:
+            parsed = urlparse(url)
+        except Exception:
+            return url  # let URLField handle invalids
+        path = (parsed.path or "").rstrip("/")
+        # Disallow URLs that already include API or internal pages
+        if path.endswith("/api") or path.startswith("/api/") or \
+           "/api/" in path or "/settings" in path:
+            raise forms.ValidationError(
+                "Please enter the application root URL (e.g. http://host:7878 or http://host:8989/radarr), not an API or internal page URL."
+            )
+        return url
+
+ArrInstanceFormSet = modelformset_factory(
+    ArrInstance,
+    form=ArrInstanceForm,
+    extra=0,
+    can_delete=True,
+)

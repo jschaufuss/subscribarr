@@ -2,7 +2,8 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.template.loader import render_to_string
 from django.utils import timezone
-from settingspanel.models import AppSettings
+from datetime import timedelta
+from settingspanel.models import AppSettings, ArrInstance
 # from accounts.utils import JellyfinClient  # not needed for availability; use Sonarr/Radarr instead
 import requests
 from dateutil.parser import isoparse
@@ -193,14 +194,18 @@ def _dispatch_user_notification(user, subject: str, body_text: str, html_message
         return False
 
 
-def _get_arr_cfg():
+def _enabled_instances(kind: str):
+    """Return enabled ArrInstance list for a kind (sonarr|radarr). Fallback to legacy single settings if none exist."""
+    inst = list(ArrInstance.objects.filter(enabled=True, kind=kind).order_by('order', 'id'))
+    if inst:
+        return inst
+    # Fallback to legacy single-instance config
     cfg = AppSettings.current()
-    return {
-        'sonarr_url': (cfg.sonarr_url or '').strip(),
-        'sonarr_key': (cfg.sonarr_api_key or '').strip(),
-        'radarr_url': (cfg.radarr_url or '').strip(),
-        'radarr_key': (cfg.radarr_api_key or '').strip(),
-    }
+    if kind == 'sonarr' and cfg.sonarr_url and cfg.sonarr_api_key:
+        return [ArrInstance(kind='sonarr', name='Default', base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)]
+    if kind == 'radarr' and cfg.radarr_url and cfg.radarr_api_key:
+        return [ArrInstance(kind='radarr', name='Default', base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)]
+    return []
 
 
 def _sonarr_get(url_base, api_key, path, params=None, timeout=10):
@@ -228,42 +233,53 @@ def _radarr_get(url_base, api_key, path, params=None, timeout=10):
 
 
 def sonarr_episode_has_file(series_id: int, season: int, episode: int) -> bool:
-    cfg = _get_arr_cfg()
-    data = _sonarr_get(cfg['sonarr_url'], cfg['sonarr_key'], "/api/v3/episode", params={"seriesId": series_id}) or []
-    for ep in data:
-        if ep.get("seasonNumber") == season and ep.get("episodeNumber") == episode:
-            return bool(ep.get("hasFile"))
+    for inst in _enabled_instances('sonarr'):
+        data = _sonarr_get(inst.base_url, inst.api_key, "/api/v3/episode", params={"seriesId": series_id}) or []
+        for ep in data:
+            if ep.get("seasonNumber") == season and ep.get("episodeNumber") == episode:
+                if bool(ep.get("hasFile")):
+                    return True
     return False
 
 
 def radarr_movie_has_file(movie_id: int) -> bool:
-    cfg = _get_arr_cfg()
-    data = _radarr_get(cfg['radarr_url'], cfg['radarr_key'], f"/api/v3/movie/{movie_id}")
-    if not data:
-        return False
-    return bool(data.get("hasFile"))
+    for inst in _enabled_instances('radarr'):
+        data = _radarr_get(inst.base_url, inst.api_key, f"/api/v3/movie/{movie_id}")
+        if not data:
+            continue
+        if bool(data.get("hasFile")):
+            return True
+    return False
 
 
-def get_todays_sonarr_calendar():
+def get_todays_sonarr_calendar(lookahead_days: int = 0):
     from .services import sonarr_calendar
-    cfg = _get_arr_cfg()
-    items = sonarr_calendar(days=1, base_url=cfg['sonarr_url'], api_key=cfg['sonarr_key']) or []
+    items = []
+    for inst in _enabled_instances('sonarr'):
+        try:
+            items.extend(sonarr_calendar(days=max(1, 1+int(lookahead_days)), base_url=inst.base_url, api_key=inst.api_key) or [])
+        except Exception:
+            continue
     today = timezone.now().date()
     todays = []
     for it in items:
         try:
             ad = isoparse(it.get("airDateUtc")) if it.get("airDateUtc") else None
-            if ad and ad.date() == today:
+            if ad and today <= ad.date() <= (today + timedelta(days=max(0,int(lookahead_days)))):
                 todays.append(it)
         except Exception:
             pass
     return todays
 
 
-def get_todays_radarr_calendar():
+def get_todays_radarr_calendar(lookahead_days: int = 0):
     from .services import radarr_calendar
-    cfg = _get_arr_cfg()
-    items = radarr_calendar(days=1, base_url=cfg['radarr_url'], api_key=cfg['radarr_key']) or []
+    items = []
+    for inst in _enabled_instances('radarr'):
+        try:
+            items.extend(radarr_calendar(days=max(1, 1+int(lookahead_days)), base_url=inst.base_url, api_key=inst.api_key) or [])
+        except Exception:
+            continue
     today = timezone.now().date()
     todays = []
     for it in items:
@@ -274,7 +290,7 @@ def get_todays_radarr_calendar():
                 continue
             try:
                 d = isoparse(v).date()
-                if d == today:
+                if today <= d <= (today + timedelta(days=max(0,int(lookahead_days)))):
                     todays.append(it)
                     break
             except Exception:
@@ -303,8 +319,10 @@ def check_and_notify_users():
     from .models import SeriesSubscription, MovieSubscription, SentNotification
 
     # calendars for today
-    todays_series = get_todays_sonarr_calendar()
-    todays_movies = get_todays_radarr_calendar()
+    cfg = AppSettings.current()
+    la = max(0, int(getattr(cfg, 'notify_lookahead_days', 1) or 0))
+    todays_series = get_todays_sonarr_calendar(lookahead_days=la)
+    todays_movies = get_todays_radarr_calendar(lookahead_days=la)
 
     # index by ids for quick lookup
     series_idx = {}
@@ -328,10 +346,17 @@ def check_and_notify_users():
             number = ep.get("episodeNumber")
             if season is None or number is None:
                 continue
+            # Only notify for episodes on/after the user's subscription date
+            try:
+                ad = isoparse(ep.get("airDateUtc")).date() if ep.get("airDateUtc") else None
+            except Exception:
+                ad = None
+            if ad and getattr(sub, 'created_at', None) and sub.created_at.date() > ad:
+                continue
 
             # duplicate guard will be handled atomically before dispatch
-
             # check availability via Sonarr hasFile
+            # Early availability: notify immediately if file present, regardless of whether air date is today or within lookahead
             if sonarr_episode_has_file(sub.series_id, season, number):
                 # Build subject/body
                 subj = f"New episode available: {sub.series_title} S{season:02d}E{number:02d}"
@@ -353,32 +378,45 @@ def check_and_notify_users():
                     html = render_to_string('arr_api/email/new_media_notification.html', ctx)
                 except Exception:
                     pass
-                # Reserve duplicate token atomically, then dispatch; rollback on failure
-                if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                    try:
-                        with transaction.atomic():
-                            token, created = SentNotification.objects.get_or_create(
-                                user=sub.user,
-                                media_id=sub.series_id,
-                                media_type='series',
-                                air_date=today,
-                                defaults={'media_title': sub.series_title}
-                            )
-                        if not created:
-                            continue
-                    except Exception:
-                        # race or DB error -> skip to avoid duplicates
+                # Reserve duplicate token per episode atomically, then dispatch; rollback on failure
+                episode_id = ep.get('episodeId') or 0
+                if not episode_id:
+                    continue
+                event_date = ad or today
+                try:
+                    with transaction.atomic():
+                        token, created = SentNotification.objects.get_or_create(
+                            user=sub.user,
+                            media_id=episode_id,
+                            media_type='series',
+                            air_date=event_date,
+                            defaults={'media_title': sub.series_title}
+                        )
+                    if not created:
                         continue
+                except Exception:
+                    continue
                 ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-                if not ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
+                if not ok:
                     # allow retry on next run
                     try:
                         SentNotification.objects.filter(
                             user=sub.user,
-                            media_id=sub.series_id,
+                            media_id=episode_id,
                             media_type='series',
-                            air_date=today
+                            air_date=event_date
                         ).delete()
+                    except Exception:
+                        pass
+                else:
+                    # Auto-unsubscribe if series ended (no more releases expected)
+                    try:
+                        for inst in _enabled_instances('sonarr'):
+                            s = _sonarr_get(inst.base_url, inst.api_key, f"/api/v3/series/{sub.series_id}") or {}
+                            status = (s.get('status') or '').lower()
+                            if status == 'ended':
+                                sub.delete()
+                                break
                     except Exception:
                         pass
 
@@ -394,65 +432,46 @@ def check_and_notify_users():
         if not it:
             continue
 
-        if radarr_movie_has_file(sub.movie_id):
-            # detect which release matched today
-            rel = None
-            try:
-                for key, name in (("digitalRelease", "Digital"), ("physicalRelease", "Disc"), ("inCinemas", "Kino")):
-                    v = it.get(key)
-                    if not v:
-                        continue
+        # Determine event date and ensure it's not before subscription
+        event_date = None
+        try:
+            for k in ("digitalRelease", "physicalRelease", "inCinemas"):
+                v = it.get(k)
+                if v:
                     d = isoparse(v).date()
-                    if d == today:
-                        rel = name
+                    if d:
+                        event_date = d
+                        break
+        except Exception:
+            event_date = None
+        if event_date and getattr(sub, 'created_at', None) and sub.created_at.date() > event_date:
+            continue
+
+        
+
+    # Cleanup lingering subs: ended series and movies already available
+    try:
+        for sub in SeriesSubscription.objects.select_related('user').all():
+            try:
+                for inst in _enabled_instances('sonarr'):
+                    s = _sonarr_get(inst.base_url, inst.api_key, f"/api/v3/series/{sub.series_id}") or {}
+                    status = (s.get('status') or '').lower()
+                    if status == 'ended':
+                        sub.delete()
                         break
             except Exception:
-                pass
-
-            subj = f"New movie available: {sub.title}"
-            if rel:
-                subj += f" ({rel})"
-            body = f"{sub.title} is now available."
-            html = None
+                continue
+    except Exception:
+        pass
+    try:
+        for sub in MovieSubscription.objects.select_related('user').all():
             try:
-                ctx = {
-                    'username': sub.user.username,
-                    'title': sub.title,
-                    'type': 'Film',
-                    'overview': sub.overview,
-                    'poster_url': it.get('posterUrl'),
-                    'year': it.get('year'),
-                    'release_type': rel,
-                }
-                html = render_to_string('arr_api/email/new_media_notification.html', ctx)
+                if radarr_movie_has_file(sub.movie_id):
+                    sub.delete()
             except Exception:
-                pass
-            # Reserve duplicate token atomically, then dispatch; rollback on failure
-            if not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                try:
-                    with transaction.atomic():
-                        token, created = SentNotification.objects.get_or_create(
-                            user=sub.user,
-                            media_id=sub.movie_id,
-                            media_type='movie',
-                            air_date=today,
-                            defaults={'media_title': sub.title}
-                        )
-                    if not created:
-                        continue
-                except Exception:
-                    continue
-            ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-            if not ok and not getattr(settings, 'NOTIFICATIONS_ALLOW_DUPLICATES', False):
-                try:
-                    SentNotification.objects.filter(
-                        user=sub.user,
-                        media_id=sub.movie_id,
-                        media_type='movie',
-                        air_date=today
-                    ).delete()
-                except Exception:
-                    pass
+                continue
+    except Exception:
+        pass
 
 
 def has_new_episode_today(series_id):
@@ -467,3 +486,4 @@ def has_movie_release_today(movie_id):
     Legacy helper no longer used directly.
     """
     return True
+

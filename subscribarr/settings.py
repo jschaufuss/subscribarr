@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'arr_api',
     'settingspanel',
     'accounts',
+    'youtube',
 ]
 
 MIDDLEWARE = [
@@ -180,8 +181,3 @@ EMAIL_USE_SSL = False
 EMAIL_HOST_USER = None  # Will be set from AppSettings
 EMAIL_HOST_PASSWORD = None  # Will be set from AppSettings
 DEFAULT_FROM_EMAIL = None  # Will be set from AppSettings
-
-# Notifications / Debug
-# If True, duplicate suppression is disabled and emails can be resent on every run.
-# Default is False to avoid accidental duplicate mails in local/dev runs.
-NOTIFICATIONS_ALLOW_DUPLICATES = os.getenv('NOTIFICATIONS_ALLOW_DUPLICATES', 'False').lower() == 'true'

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "settingspanel/setup_base.html" %}
 {% load static %}
 
 {% block extra_style %}
@@ -7,8 +7,11 @@
 
 {% block content %}
 <div class="setup-container">
-    <h1>Welcome to Subscribarr</h1>
-    <p class="setup-intro">Let's set up your installation. You need at least one Jellyfin server.</p>
+    <div class="setup-header">
+        <img src="{% static 'images/logo.png' %}" alt="Subscribarr" class="setup-logo">
+        <h1>Welcome to Subscribarr</h1>
+    </div>
+    <p class="setup-intro">Let's set up your installation. You need at least one Jellyfin server. Additional Sonarr/Radarr instances can be added later in Administration → Settings.</p>
 
     <form method="post" class="setup-form">
         {% csrf_token %}
@@ -25,10 +28,15 @@
                 {{ form.jellyfin_api_key }}
                 <div class="help">Admin API key from Jellyfin settings</div>
             </div>
+            <div class="form-group">
+                <button type="button" class="btn test-btn" onclick="testJellyfin()">Test Jellyfin Connection</button>
+                <div id="jellyfin-test-result" class="test-result"></div>
+            </div>
         </div>
 
         <div class="setup-section">
             <h2>Sonarr (optional)</h2>
+            <p class="help">Note: You can add more instances later in the admin settings.</p>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.sonarr_url }}
@@ -37,10 +45,15 @@
                 <label>API Key</label>
                 {{ form.sonarr_api_key }}
             </div>
+            <div class="form-group">
+                <button type="button" class="btn test-btn" onclick="testSonarr()">Test Sonarr Connection</button>
+                <div id="sonarr-test-result" class="test-result"></div>
+            </div>
         </div>
 
         <div class="setup-section">
             <h2>Radarr (optional)</h2>
+            <p class="help">Note: You can add more instances later in the admin settings.</p>
             <div class="form-group">
                 <label>Server URL</label>
                 {{ form.radarr_url }}
@@ -49,9 +62,121 @@
                 <label>API Key</label>
                 {{ form.radarr_api_key }}
             </div>
+            <div class="form-group">
+                <button type="button" class="btn test-btn" onclick="testRadarr()">Test Radarr Connection</button>
+                <div id="radarr-test-result" class="test-result"></div>
+            </div>
         </div>
 
-    <button type="submit" class="setup-submit">Finish setup</button>
+    <button type="submit" class="setup-submit" id="setup-submit" disabled>Test Jellyfin first</button>
     </form>
 </div>
+
+<script>
+let jellyfinTested = false;
+
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function showTestResult(elementId, success, message) {
+    const el = document.getElementById(elementId);
+    el.className = 'test-result ' + (success ? 'success' : 'error');
+    el.textContent = message;
+    
+    // Update submit button state if this is Jellyfin test
+    if (elementId === 'jellyfin-test-result') {
+        jellyfinTested = success;
+        updateSubmitButton();
+    }
+}
+
+function updateSubmitButton() {
+    const submitBtn = document.getElementById('setup-submit');
+    if (jellyfinTested) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Finish setup';
+        submitBtn.style.background = 'var(--accent)';
+    } else {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Test Jellyfin first';
+        submitBtn.style.background = '#555';
+    }
+}
+
+function testJellyfin() {
+    const url = document.querySelector('[name=jellyfin_server_url]').value;
+    const apiKey = document.querySelector('[name=jellyfin_api_key]').value;
+    
+    if (!url || !apiKey) {
+        showTestResult('jellyfin-test-result', false, 'Please enter both URL and API key');
+        return;
+    }
+
+    showTestResult('jellyfin-test-result', true, 'Testing...');
+    
+    fetch(`{% url "settingspanel:test_setup_connection" %}?kind=jellyfin&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            showTestResult('jellyfin-test-result', true, data.message || 'Jellyfin connection successful!');
+        } else {
+            showTestResult('jellyfin-test-result', false, 'Jellyfin error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(() => {
+        showTestResult('jellyfin-test-result', false, 'Connection failed');
+    });
+}
+
+function testSonarr() {
+    const url = document.querySelector('[name=sonarr_url]').value;
+    const apiKey = document.querySelector('[name=sonarr_api_key]').value;
+    
+    if (!url || !apiKey) {
+        showTestResult('sonarr-test-result', false, 'Please enter both URL and API key');
+        return;
+    }
+
+    showTestResult('sonarr-test-result', true, 'Testing...');
+    
+    fetch(`{% url "settingspanel:test_setup_connection" %}?kind=sonarr&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            showTestResult('sonarr-test-result', true, 'Sonarr connection successful!');
+        } else {
+            showTestResult('sonarr-test-result', false, 'Sonarr error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(() => {
+        showTestResult('sonarr-test-result', false, 'Connection failed');
+    });
+}
+
+function testRadarr() {
+    const url = document.querySelector('[name=radarr_url]').value;
+    const apiKey = document.querySelector('[name=radarr_api_key]').value;
+    
+    if (!url || !apiKey) {
+        showTestResult('radarr-test-result', false, 'Please enter both URL and API key');
+        return;
+    }
+
+    showTestResult('radarr-test-result', true, 'Testing...');
+    
+    fetch(`{% url "settingspanel:test_setup_connection" %}?kind=radarr&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.ok) {
+            showTestResult('radarr-test-result', true, 'Radarr connection successful!');
+        } else {
+            showTestResult('radarr-test-result', false, 'Radarr error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(() => {
+        showTestResult('radarr-test-result', false, 'Connection failed');
+    });
+}
+</script>
 {% endblock %}

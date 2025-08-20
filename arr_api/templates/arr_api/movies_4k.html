@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}4K – Subscribarr{% endblock %}
+
+{% block extra_style %}
+<link rel="stylesheet" href="{% static 'css/index.css' %}">
+<style>
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+/* Constrain content matching other pages */
+.wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.card { position: relative; background: var(--card-bg, #111); border: 1px solid var(--border, #333); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; }
+.card img { width: 100%; height: 320px; object-fit: cover; background: #222; }
+.card .body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.card .title { font-weight: 600; }
+.card .muted { color: var(--muted, #aaa); font-size: 0.9rem; }
+.card .actions { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 8px; }
+.card .badge { position: absolute; left: 8px; top: 8px; background: #1c7d32; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.08); }
+.btn { padding: 6px 10px; border: 1px solid var(--border, #333); background: var(--btn-bg, #1e1e1e); color: #fff; border-radius: 6px; cursor: pointer; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-accent:hover { filter: brightness(1.1); }
+.toolbar { display: flex; gap: 8px; align-items: center; margin: 8px 0 16px; flex-wrap: wrap; }
+.toolbar form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
+.pager { display: flex; gap: 8px; align-items: center; margin-top: 16px; }
+.pager .muted { margin: 0 8px; white-space: nowrap; }
+/* Modal uses main page styles from index.css */
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+  /* Prevent horizontal overflow from toolbar */
+  .toolbar { justify-content: flex-start !important; }
+  .toolbar-form { width: 100%; display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .toolbar-form input[type="text"],
+  .toolbar-form select,
+  .toolbar-form .btn.apply { width: 100% !important; min-width: 0 !important; }
+  .pager { width: 100%; margin: 0 !important; justify-content: center; flex-wrap: nowrap; }
+  .pager .btn { width: auto; padding: 8px 10px; }
+  .grid-cards { grid-template-columns: 1fr; gap: 12px; }
+  .card img { height: 260px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>4K</h1>
+  <p class="muted">Movies known across your Radarr instances that currently do not have a 4K file anywhere. Subscribe to get notified once 4K appears on any instance.</p>
+  <div class="toolbar" style="justify-content: flex-end;">
+    <form method="get" action="" class="toolbar-form">
+      <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Search…" style="padding:8px 10px;border-radius:8px;border:1px solid #2a2a34;background:#111119;color:#e6e6e6;min-width:220px;">
+      <select name="pp" style="padding:8px 10px;border-radius:8px;border:1px solid #2a2a34;background:#111119;color:#e6e6e6;">
+        {% for opt in per_page_options %}
+          <option value="{{ opt }}" {% if pp == opt %}selected{% endif %}>{{ opt }}/page</option>
+        {% endfor %}
+        <option value="all" {% if pp_is_all %}selected{% endif %}>All</option>
+      </select>
+      <input type="hidden" name="page" value="{{ page }}">
+  <button type="submit" class="btn btn-accent apply">Apply</button>
+      <div class="pager" style="margin:0 0 0 8px;">
+        {% if has_prev %}
+          <a class="btn" href="?page={{ prev_page }}&pp={{ pp }}{% if q %}&q={{ q|urlencode }}{% endif %}">Prev</a>
+        {% endif %}
+        <span class="muted">Page {{ page }} of {{ pages }}</span>
+        {% if has_next %}
+          <a class="btn" href="?page={{ next_page }}&pp={{ pp }}{% if q %}&q={{ q|urlencode }}{% endif %}">Next</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+  <form style="display:none">{% csrf_token %}</form>
+  {% if items %}
+  <div class="grid-cards">
+    {% for it in items %}
+  <div class="card{% if it.is_subscribed_4k %} subscribed{% endif %}" data-tmdb="{{ it.tmdbId }}" data-title="{{ it.title|escape }}" data-poster="{{ it.poster|default:'' }}" data-overview="{{ it.overview|default:''|escape }}" data-subscribed="{{ it.is_subscribed_4k|yesno:'1,0' }}">
+      {% if it.poster %}
+      <img src="{{ it.poster }}" alt="{{ it.title }} poster">
+      {% else %}
+  <img src="{% static 'images/logo.png' %}" alt="">
+      {% endif %}
+      <div class="body">
+        <div class="title">{{ it.title }}{% if it.year %} ({{ it.year }}){% endif %}</div>
+        {% if it.overview %}<div class="muted">{{ it.overview|truncatewords:30 }}</div>{% endif %}
+  <div class="actions" style="display:none"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  
+  {% else %}
+  <p>No items found.</p>
+  {% endif %}
+</div>
+
+<!-- Modal (same structure and styles as main page) -->
+<div id="modalBackdrop4k" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="m-poster-wrap">
+        <div class="m-poster"><img id="m4kPoster" alt=""></div>
+        <button id="subscribeBtn4k" class="btn-subscribe" type="button">Subscribe</button>
+      </div>
+      <div>
+        <div id="m4kTitle" class="m-title"></div>
+        <div id="m4kSub" class="m-sub"></div>
+        <div id="m4kBadges" class="badges"></div>
+      </div>
+      <button class="modal-close" title="Close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="section-block">
+        <div class="section-title">Overview</div>
+        <div id="m4kOverview" class="desc muted"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  async function post(url){
+    const csrftoken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/)||[])[1];
+    const res = await fetch(url, {method:'POST', headers:{'X-CSRFToken': csrftoken}});
+    return res.ok;
+  }
+  // Modal behavior (like main page)
+  const backdrop = document.getElementById('modalBackdrop4k');
+  const closeBtn = backdrop.querySelector('.modal-close');
+  const mTitle = document.getElementById('m4kTitle');
+  const mPoster = document.getElementById('m4kPoster');
+  const mOverview = document.getElementById('m4kOverview');
+  const subscribeBtn = document.getElementById('subscribeBtn4k');
+  const mBadges = document.getElementById('m4kBadges');
+  const mSub = document.getElementById('m4kSub');
+
+  function openModal(){
+    backdrop.style.display = 'flex';
+    backdrop.setAttribute('aria-hidden','false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(){
+    backdrop.style.display = 'none';
+    backdrop.setAttribute('aria-hidden','true');
+    document.body.style.overflow = '';
+  }
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
+  window.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeModal(); });
+
+  let lastCard = null;
+  function applySubUI(card, on){
+    if(card){ card.classList.toggle('subscribed', !!on); }
+    if(subscribeBtn){
+      subscribeBtn.textContent = on ? 'Unsubscribe' : 'Subscribe';
+      subscribeBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  document.querySelectorAll('.grid-cards .card').forEach(card => {
+    card.addEventListener('click', (e) => {
+  if (e.target && (e.target.classList.contains('btn') || e.target.closest('.actions'))) return;
+      lastCard = card;
+      const title = card.dataset.title || '';
+      const poster = card.dataset.poster || '';
+      const overview = card.dataset.overview || '';
+      mTitle.textContent = title;
+  mPoster.src = poster || "{% static 'images/logo.png' %}";
+      mPoster.alt = title;
+      mOverview.textContent = overview || '';
+      mBadges.innerHTML = '';
+      mSub.textContent = '';
+  applySubUI(card, card.dataset.subscribed === '1');
+      openModal();
+    });
+  });
+  // Card-level subscribe/unsubscribe buttons removed; actions handled in modal
+
+  // Modal subscribe button mirrors card state
+  if (subscribeBtn) {
+    subscribeBtn.addEventListener('click', async () => {
+      if (!lastCard) return;
+      const tmdb = lastCard.dataset.tmdb;
+      if(!tmdb) return;
+      const on = !(lastCard.dataset.subscribed === '1');
+      const url = on ? `/api/movies4k/subscribe/${tmdb}/` : `/api/movies4k/unsubscribe/${tmdb}/`;
+      subscribeBtn.disabled = true;
+      try {
+        const csrftoken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/)||[])[1];
+        const resp = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken } });
+        if (resp.status === 403) { window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname); return; }
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        // Update card UI
+        if (on) {
+          lastCard.dataset.subscribed = '1';
+          const unbtn = lastCard.querySelector('.btn-unsubscribe'); if (unbtn) unbtn.style.display = '';
+          const sbtn = lastCard.querySelector('.btn-subscribe'); if (sbtn) sbtn.style.display = 'none';
+          lastCard.classList.add('subscribed');
+        } else {
+          lastCard.dataset.subscribed = '0';
+          const unbtn = lastCard.querySelector('.btn-unsubscribe'); if (unbtn) unbtn.style.display = 'none';
+          const sbtn = lastCard.querySelector('.btn-subscribe'); if (sbtn) { sbtn.disabled = false; sbtn.style.display = ''; }
+          lastCard.classList.remove('subscribed');
+        }
+        applySubUI(lastCard, on);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        subscribeBtn.disabled = false;
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

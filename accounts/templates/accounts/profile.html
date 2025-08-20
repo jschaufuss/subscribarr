@@ -3,6 +3,7 @@
 
 {% block extra_style %}
 <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/index.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -62,7 +63,7 @@
         {% if series_subs %}
         <div class="subscription-list">
             {% for sub in series_subs %}
-            <div class="subscription-item">
+            <div class="subscription-item" data-kind="series" data-series-id="{{ sub.series_id }}" data-title="{{ sub.series_title|escape }}" data-poster="{{ sub.series_poster|default:'' }}" data-overview="{{ sub.series_overview|default:''|escape }}">
                 {% if sub.series_poster %}
                 <img src="{{ sub.series_poster }}" alt="{{ sub.series_title }}" class="subscription-poster">
                 {% else %}
@@ -86,7 +87,7 @@
         {% if movie_subs %}
         <div class="subscription-list">
             {% for sub in movie_subs %}
-            <div class="subscription-item">
+            <div class="subscription-item" data-kind="movie" data-title="{{ sub.title|escape }}" data-title-qs="{{ sub.title|urlencode }}" data-poster="{{ sub.poster|default:'' }}" data-overview="{{ sub.overview|default:''|escape }}">
                 {% if sub.poster %}
                 <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
                 {% else %}
@@ -105,6 +106,213 @@
         {% else %}
     <p class="muted">No movies subscribed.</p>
         {% endif %}
+
+    <h4>Movies (4K)</h4>
+        {% if movie4k_subs %}
+        <div class="subscription-list">
+            {% for sub in movie4k_subs %}
+        <div class="subscription-item" data-kind="movie4k" data-tmdb-id="{{ sub.tmdb_id }}" data-title="{{ sub.title|default:'(unknown)'|escape }}" data-poster="{{ sub.poster|default:'' }}" data-overview="{{ sub.overview|default:''|escape }}">
+                {% if sub.poster %}
+                <img src="{{ sub.poster }}" alt="{{ sub.title }}" class="subscription-poster">
+                {% else %}
+                <img src="https://via.placeholder.com/80x120?text=No+Poster" alt="" class="subscription-poster">
+                {% endif %}
+                <div class="subscription-info">
+                    <div class="subscription-title">{{ sub.title|default:"(unknown)" }}</div>
+                    <div class="subscription-date">TMDB: {{ sub.tmdb_id }}</div>
+                    <div class="subscription-date">Subscribed on {{ sub.created_at|date:"d.m.Y" }}</div>
+            {% if sub.overview %}
+            <div class="subscription-overview">{{ sub.overview|truncatechars:100 }}</div>
+            {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+    <p class="muted">No 4K subscriptions.</p>
+        {% endif %}
+
+    <h4>YouTube</h4>
+        {% if yt_items %}
+        {% static 'images/youtube.png' as yt_icon %}
+        <div class="subscription-list">
+            {% for it in yt_items %}
+            {% with y=it.sub m=it.meta %}
+            <div class="subscription-item" data-kind="youtube" data-yt-kind="{{ y.kind }}" data-target-id="{{ y.target_id }}" data-title="{{ m.title|default:y.title|escape }}" data-poster="{{ m.image|default:yt_icon }}" data-url="{{ m.url|default:'' }}">
+                <img src="{{ m.image|default:yt_icon }}" alt="YouTube" class="subscription-poster" style="object-fit: cover; background: #000">
+                <div class="subscription-info">
+                    {% if m.url %}
+                    <a href="{{ m.url }}" target="_blank" rel="noopener" class="subscription-title" style="color: var(--text); text-decoration: none">{{ m.title|default:y.title }}</a>
+                    {% else %}
+                    <div class="subscription-title">{{ m.title|default:y.title }}</div>
+                    {% endif %}
+                    <div class="subscription-date">{{ y.get_kind_display }} — ID: {{ y.target_id }}</div>
+                    <div class="subscription-date">Subscribed on {{ y.created_at|date:"d.m.Y" }}</div>
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+        {% else %}
+    <p class="muted">No YouTube subscriptions.</p>
+        {% endif %}
     </div>
 </div>
+{% csrf_token %}
+
+<!-- Modal for profile (same style as main) -->
+<div id="modalBackdropProfile" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="m-poster-wrap">
+                <div class="m-poster"><img id="pPoster" alt=""></div>
+                <button id="pUnsubBtn" class="btn-subscribe" type="button">Unsubscribe</button>
+            </div>
+            <div>
+                <div id="pTitle" class="m-title"></div>
+                <div id="pSub" class="m-sub"></div>
+                <div id="pBadges" class="badges"></div>
+            </div>
+            <button class="modal-close" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="section-block">
+                <div class="section-title">Overview</div>
+                <div id="pOverview" class="desc muted"></div>
+            </div>
+        </div>
+    </div>
+  
+</div>
+
+<script>
+(function(){
+    const backdrop = document.getElementById('modalBackdropProfile');
+    const closeBtn = backdrop.querySelector('.modal-close');
+    const pPoster = document.getElementById('pPoster');
+    const pTitle = document.getElementById('pTitle');
+    const pOverview = document.getElementById('pOverview');
+    const pUnsubBtn = document.getElementById('pUnsubBtn');
+    const pSub = document.getElementById('pSub');
+    const pBadges = document.getElementById('pBadges');
+
+    let currentItem = null;
+
+    function openModal(){
+        backdrop.style.display = 'flex';
+        backdrop.setAttribute('aria-hidden','false');
+        document.body.style.overflow = 'hidden';
+        // ensure the Unsubscribe button is enabled for each new open
+        if (pUnsubBtn) { pUnsubBtn.disabled = false; pUnsubBtn.textContent = 'Unsubscribe'; }
+    }
+    function closeModal(){
+        backdrop.style.display = 'none';
+        backdrop.setAttribute('aria-hidden','true');
+        document.body.style.overflow = '';
+        // reset button for next use
+        if (pUnsubBtn) { pUnsubBtn.disabled = false; }
+    }
+    closeBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
+    window.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeModal(); });
+
+    function getCSRF(){
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/)||[])[1];
+    }
+
+    function fillModalFromItem(el){
+        const title = el.dataset.title || '';
+        const poster = el.dataset.poster || '';
+        const overview = el.dataset.overview || '';
+        pTitle.textContent = title;
+        pPoster.src = poster || 'https://via.placeholder.com/130x195?text=No+Poster';
+        pPoster.alt = title;
+        pOverview.textContent = overview || '';
+        pSub.textContent = '';
+        pBadges.innerHTML = '';
+    }
+
+        function showError(msg){
+            const n = document.createElement('div');
+            n.className = 'error-message';
+            n.textContent = msg || 'Failed to update subscription.';
+            document.body.appendChild(n);
+            setTimeout(()=>n.remove(), 3000);
+        }
+
+        function handleEmptyList(listEl, kind){
+            if (!listEl) return;
+            if (listEl.querySelectorAll('.subscription-item').length > 0) return;
+            const p = document.createElement('p');
+            p.className = 'muted';
+            p.textContent = kind === 'series' ? 'No series subscribed.'
+                : kind === 'movie' ? 'No movies subscribed.'
+                : kind === 'movie4k' ? 'No 4K subscriptions.'
+                : 'No YouTube subscriptions.';
+            listEl.after(p);
+        }
+
+        async function doUnsubscribe(el){
+        const kind = el.dataset.kind;
+        const headers = { 'X-CSRFToken': getCSRF() };
+        let url = null;
+        let opts = { method: 'POST', headers };
+        if(kind === 'series'){
+            const id = el.dataset.seriesId;
+            url = `/api/series/unsubscribe/${encodeURIComponent(id)}/`;
+        } else if(kind === 'movie'){
+                const qs = el.dataset.titleQs || '';
+                if(!qs){ return false; }
+                url = `/api/movies/unsubscribe/${qs}/`;
+        } else if(kind === 'movie4k'){
+            const tmdb = el.dataset.tmdbId;
+            url = `/api/movies4k/unsubscribe/${encodeURIComponent(tmdb)}/`;
+        } else if(kind === 'youtube'){
+            const ytKind = el.dataset.ytKind;
+            const target = el.dataset.targetId;
+            url = `/youtube/unsubscribe/`;
+            opts = { method: 'POST', headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ kind: ytKind, target_id: target }).toString() };
+        }
+        if(!url) return false;
+        const resp = await fetch(url, opts);
+        if(resp.status === 403){ window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname); return false; }
+            return resp.ok;
+    }
+
+        document.querySelectorAll('.subscription-item').forEach(item => {
+        item.style.cursor = 'pointer';
+            item.addEventListener('click', (e) => {
+                // If user clicked a link (e.g., YouTube URL), don't open modal
+                if (e.target && (e.target.tagName === 'A' || e.target.closest('a'))) return;
+            currentItem = item;
+            fillModalFromItem(item);
+            pUnsubBtn.textContent = 'Unsubscribe';
+            openModal();
+        });
+    });
+
+        pUnsubBtn.addEventListener('click', async () => {
+            if(!currentItem) return;
+            pUnsubBtn.disabled = true;
+            try {
+                const ok = await doUnsubscribe(currentItem);
+                if(ok){
+                    const list = currentItem.closest('.subscription-list');
+                    const kind = currentItem.dataset.kind;
+                    currentItem.remove();
+                    currentItem = null;
+                    handleEmptyList(list, kind);
+                    closeModal();
+                } else {
+                    showError('Failed to unsubscribe.');
+                    pUnsubBtn.disabled = false;
+                }
+            } catch (e) {
+                console.error(e);
+                showError('Unexpected error.');
+                pUnsubBtn.disabled = false;
+            }
+        });
+})();
+</script>
 {% endblock %}

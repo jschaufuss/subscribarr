@@ -12,6 +12,7 @@ class SetupMiddleware:
             # URLs, die auch ohne Setup erlaubt sind
             allowed_urls = [
                 reverse('settingspanel:setup'),
+                reverse('settingspanel:test_setup_connection'),
                 '/static/',  # Für CSS/JS
             ]
             

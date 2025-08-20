@@ -15,9 +15,11 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path, include
+from django.contrib.auth.decorators import login_required
 
 urlpatterns = [
     path('', include('arr_api.urls')),
     path('settings/', include('settingspanel.urls')),
     path('accounts/', include('accounts.urls', namespace='accounts')),
+    path('youtube/', include('youtube.urls', namespace='youtube')),
 ]

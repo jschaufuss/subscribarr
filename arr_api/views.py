@@ -10,9 +10,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from settingspanel.models import AppSettings
-from .services import sonarr_calendar, radarr_calendar, ArrServiceError
-from .models import SeriesSubscription, MovieSubscription
+from settingspanel.models import AppSettings, ArrInstance
+from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, tmdb_is_available_any_instance, sonarr_calendar_cached, radarr_calendar_cached
+from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
 
 
@@ -23,14 +23,18 @@ def _get_int(request, key, default):
     except (TypeError, ValueError):
         return default
 
-def _arr_conf_from_db():
+def _arr_instances():
+    inst = list(ArrInstance.objects.filter(enabled=True).order_by("order", "id"))
+    if inst:
+        return inst
+    # Fallback to legacy single-instance fields for backward compatibility
     cfg = AppSettings.current()
-    return {
-        "sonarr_url": cfg.sonarr_url,
-        "sonarr_key": cfg.sonarr_api_key,
-        "radarr_url": cfg.radarr_url,
-        "radarr_key": cfg.radarr_api_key,
-    }
+    fallback = []
+    if cfg.sonarr_url and cfg.sonarr_api_key:
+        fallback.append(ArrInstance(kind="sonarr", name="Default", base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key))
+    if cfg.radarr_url and cfg.radarr_api_key:
+        fallback.append(ArrInstance(kind="radarr", name="Default", base_url=cfg.radarr_url, api_key=cfg.radarr_api_key))
+    return fallback
 
 
 #class SonarrAiringView(APIView):
@@ -55,26 +59,25 @@ def _arr_conf_from_db():
 #            return Response({"error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
+@method_decorator(login_required, name='dispatch')
 class ArrIndexView(View):
     def get(self, request):
         q = (request.GET.get("q") or "").lower().strip()
         kind = (request.GET.get("kind") or "all").lower()
         days = _get_int(request, "days", 30)
 
-        conf = _arr_conf_from_db()
-
         eps, movies = [], []
-        # Sonarr robust laden
-        try:
-            eps = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
-        except ArrServiceError as e:
-            messages.error(request, f"Sonarr is not reachable: {e}")
-
-        # Radarr robust laden
-        try:
-            movies = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
-        except ArrServiceError as e:
-            messages.error(request, f"Radarr is not reachable: {e}")
+        for inst in _arr_instances():
+            if inst.kind == "sonarr":
+                try:
+                    eps.extend(sonarr_calendar_cached(inst, days))
+                except Exception as e:
+                    messages.error(request, f"Sonarr ({inst.name}) is not reachable: {e}")
+            elif inst.kind == "radarr":
+                try:
+                    movies.extend(radarr_calendar_cached(inst, days))
+                except Exception as e:
+                    messages.error(request, f"Radarr ({inst.name}) is not reachable: {e}")
 
         # Suche
         if q:
@@ -118,6 +121,17 @@ class ArrIndexView(View):
             g["is_subscribed"] = g["seriesId"] in subscribed_series_ids
             series_grouped.append(g)
 
+        # Filter: hide movies already available (downloaded) in any configured Radarr instance by tmdbId
+        def avail_filter(m):
+            try:
+                tid = int(m.get('tmdbId') or 0)
+            except Exception:
+                tid = 0
+            if not tid:
+                return True
+            return not tmdb_is_available_any_instance(tid)
+        movies = [m for m in movies if avail_filter(m)]
+
         # Markiere abonnierte Filme
         for movie in movies:
             movie["is_subscribed"] = movie.get("movieId") in subscribed_movie_ids
@@ -133,6 +147,7 @@ class ArrIndexView(View):
         })
 
 
+@method_decorator(login_required, name='dispatch')
 class CalendarView(View):
     def get(self, request):
         days = _get_int(request, "days", 60)
@@ -143,15 +158,18 @@ class CalendarView(View):
 class CalendarEventsApi(APIView):
     def get(self, request):
         days = _get_int(request, "days", 60)
-        conf = _arr_conf_from_db()
-        try:
-            eps = sonarr_calendar(days=days, base_url=conf["sonarr_url"], api_key=conf["sonarr_key"])
-        except ArrServiceError:
-            eps = []
-        try:
-            movies = radarr_calendar(days=days, base_url=conf["radarr_url"], api_key=conf["radarr_key"])
-        except ArrServiceError:
-            movies = []
+        eps, movies = [], []
+        for inst in _arr_instances():
+            if inst.kind == "sonarr":
+                try:
+                    eps.extend(sonarr_calendar_cached(inst, days))
+                except Exception:
+                    pass
+            elif inst.kind == "radarr":
+                try:
+                    movies.extend(radarr_calendar_cached(inst, days))
+                except Exception:
+                    pass
 
         series_sub = set(SeriesSubscription.objects.filter(user=request.user).values_list('series_id', flat=True))
         movie_sub_titles = set(MovieSubscription.objects.filter(user=request.user).values_list('title', flat=True))
@@ -180,6 +198,13 @@ class CalendarEventsApi(APIView):
             })
 
         for m in movies:
+            # Skip movies already available (downloaded) in any Radarr instance (by tmdbId)
+            try:
+                tid = int(m.get('tmdbId') or 0)
+            except Exception:
+                tid = 0
+            if tid and tmdb_is_available_any_instance(tid):
+                continue
             when = m.get('digitalRelease') or m.get('physicalRelease') or m.get('inCinemas')
             if not when:
                 continue
@@ -306,10 +331,21 @@ def get_subscriptions(request):
 class SeriesSubscribeView(APIView):
     def post(self, request, series_id):
         from .services import sonarr_get_series
-        cfg = AppSettings.current()
+        # Try enabled Sonarr instances first, fallback to legacy single instance
         details = None
         try:
-            details = sonarr_get_series(series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
+            inst = ArrInstance.objects.filter(enabled=True, kind='sonarr').order_by('order', 'id')
+            for s in inst:
+                try:
+                    details = sonarr_get_series(series_id, base_url=s.base_url, api_key=s.api_key)
+                    if details:
+                        break
+                except Exception:
+                    continue
+            if not details:
+                cfg = AppSettings.current()
+                if cfg.sonarr_url and cfg.sonarr_api_key:
+                    details = sonarr_get_series(series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
         except Exception:
             details = None
         defaults = {
@@ -342,10 +378,21 @@ class SeriesUnsubscribeView(APIView):
 class MovieSubscribeView(APIView):
     def post(self, request, title):
         from .services import radarr_lookup_movie_by_title
-        cfg = AppSettings.current()
+        # Try enabled Radarr instances first, fallback to legacy single instance
         details = None
         try:
-            details = radarr_lookup_movie_by_title(title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
+            inst = ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order', 'id')
+            for r in inst:
+                try:
+                    details = radarr_lookup_movie_by_title(title, base_url=r.base_url, api_key=r.api_key)
+                    if details and (details.get('movie_id') or 0) != 0:
+                        break
+                except Exception:
+                    continue
+            if not details:
+                cfg = AppSettings.current()
+                if cfg.radarr_url and cfg.radarr_api_key:
+                    details = radarr_lookup_movie_by_title(title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
         except Exception:
             details = None
         defaults = {
@@ -385,3 +432,112 @@ class ListMovieSubscriptionsView(APIView):
     def get(self, request):
         subs = MovieSubscription.objects.filter(user=request.user).values_list('title', flat=True)
         return Response(list(subs))
+
+
+@method_decorator(login_required, name='dispatch')
+class FourKIndexView(View):
+    def get(self, request):
+        # Aggregate list of movies missing 4K across all Radarr instances
+        q = (request.GET.get('q') or '').strip().lower()
+        page = request.GET.get('page') or '1'
+        pp_raw = (request.GET.get('pp') or '').strip().lower()
+        try:
+            page = max(1, int(page))
+        except Exception:
+            page = 1
+        # per-page options: 15,25,50,100 or 'all'; default 25
+        per_page_options = [15, 25, 50, 100]
+        per_page = 25
+        pp_is_all = False
+        if pp_raw in ('all', 'alle'):
+            pp_is_all = True
+            per_page = None
+        else:
+            try:
+                pp_int = int(pp_raw) if pp_raw else per_page
+                if pp_int in per_page_options:
+                    per_page = pp_int
+            except Exception:
+                pass
+
+        items = []
+        try:
+            items = list_movies_missing_4k_across_instances()
+        except Exception:
+            items = []
+
+        if q:
+            items = [it for it in items if q in (str(it.get('title') or '').lower())]
+
+        # sort stable by title/year
+        items.sort(key=lambda it: (str(it.get('title') or '').lower(), it.get('year') or 0))
+
+        total = len(items)
+        if not pp_is_all and per_page:
+            start = (page - 1) * per_page
+            end = start + per_page
+            items = items[start:end]
+
+        # Mark already 4K-subscribed ones for current user
+        sub_tmdb = set(Movie4KSubscription.objects.filter(user=request.user).values_list('tmdb_id', flat=True))
+        for it in items:
+            it['is_subscribed_4k'] = int(it.get('tmdbId') or 0) in sub_tmdb
+
+        if pp_is_all or not per_page:
+            pages = 1
+            page = 1
+            has_prev = has_next = False
+        else:
+            pages = (total + per_page - 1) // per_page if total else 1
+            has_prev = page > 1
+            has_next = page < pages
+
+        return render(request, "arr_api/movies_4k.html", {
+            "items": items,
+            "q": q,
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "has_prev": has_prev,
+            "has_next": has_next,
+            "prev_page": page - 1 if has_prev else None,
+            "next_page": page + 1 if has_next else None,
+            "pp": ("all" if pp_is_all else per_page),
+            "per_page_options": per_page_options,
+            "pp_is_all": pp_is_all,
+        })
+
+
+@method_decorator(login_required, name='dispatch')
+class Movie4KSubscribeView(APIView):
+    def post(self, request, tmdb_id: int):
+        # If the movie is already available in 4K anywhere, we can send notification immediately and still store token to dedupe future.
+        # Store a friendly title/poster for UI by looking up metadata from any Radarr.
+        title = request.data.get('title') if request.data else None
+        poster = request.data.get('poster') if request.data else None
+        details = None
+        if not title or not poster:
+            try:
+                # Try across enabled instances
+                for inst in ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order','id'):
+                    details = radarr_lookup_movie_by_tmdb_id(tmdb_id, base_url=inst.base_url, api_key=inst.api_key)
+                    if details:
+                        break
+            except Exception:
+                details = None
+        sub, created = Movie4KSubscription.objects.get_or_create(
+            user=request.user,
+            tmdb_id=tmdb_id,
+            defaults={
+                'title': (title or (details.get('title') if details else '')) or '',
+                'poster': (poster or (details.get('poster') if details else '')) or '',
+            }
+        )
+        return Response({'status': 'subscribed'}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@method_decorator(login_required, name='dispatch')
+class Movie4KUnsubscribeView(APIView):
+    def post(self, request, tmdb_id: int):
+        Movie4KSubscription.objects.filter(user=request.user, tmdb_id=tmdb_id).delete()
+        return Response({'status': 'unsubscribed'}, status=status.HTTP_200_OK)

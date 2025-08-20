@@ -101,13 +101,62 @@
       {% endfor %}
     </div>
   </div>
+
+  <div class="section">
+  <h2>4K Movies</h2>
+    <div class="grid" id="movies4kGrid">
+      {% for m in movies_4k %}
+      <div class="card" data-user="{{ m.user.username|lower }}" data-title="{{ m.title|lower }}" data-id="{{ m.tmdb_id }}">
+        <div class="poster">
+          {% if m.poster %}
+          <img src="{{ m.poster }}" alt="{{ m.title }}">
+          {% else %}
+          <img src="https://via.placeholder.com/90x135?text=No+Poster" alt="">
+          {% endif %}
+        </div>
+        <div class="meta">
+          <div class="title">{{ m.title }}</div>
+          <div class="muted">User: <span class="user">{{ m.user.username }}</span></div>
+          <div class="muted">TMDB ID: {{ m.tmdb_id }}</div>
+          <div class="muted">Since: {{ m.created_at }}</div>
+        </div>
+      </div>
+      {% empty %}
+  <p class="muted">No 4K movie subscriptions.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="section">
+  <h2>YouTube</h2>
+    <div class="grid" id="youtubeGrid">
+      {% for yt in youtube_subs %}
+      <div class="card" data-user="{{ yt.user.username|lower }}" data-title="{{ yt.title|lower }}" data-id="{{ yt.target_id }}">
+        <div class="poster">
+          <div style="width:90px;height:135px;background:#cc2020;border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:14px;">
+            {% if yt.kind == 'channel' %}📺{% else %}📋{% endif %}
+          </div>
+        </div>
+        <div class="meta">
+          <div class="title">{{ yt.title }}</div>
+          <div class="muted">User: <span class="user">{{ yt.user.username }}</span></div>
+          <div class="muted">Type: {{ yt.get_kind_display }}</div>
+          <div class="muted">ID: {{ yt.target_id }}</div>
+          <div class="muted">Since: {{ yt.created_at }}</div>
+        </div>
+      </div>
+      {% empty %}
+  <p class="muted">No YouTube subscriptions.</p>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 <script>
 (function(){
   const q = document.getElementById('q');
   function filter(){
     const v = (q.value||'').toLowerCase();
-    [document.getElementById('seriesGrid'), document.getElementById('moviesGrid')].forEach(grid=>{
+    [document.getElementById('seriesGrid'), document.getElementById('moviesGrid'), document.getElementById('movies4kGrid'), document.getElementById('youtubeGrid')].forEach(grid=>{
       if(!grid) return; Array.from(grid.children).forEach(card=>{
         const text = (card.dataset.user + ' ' + card.dataset.title).toLowerCase();
         card.style.display = text.includes(v) ? '' : 'none';
@@ -134,6 +183,8 @@
       <div class="modal-body">
         <div class="section-block"><div class="section-title">Series</div><div id="uSeries"></div></div>
         <div class="section-block"><div class="section-title">Movies</div><div id="uMovies"></div></div>
+        <div class="section-block"><div class="section-title">4K Movies</div><div id="uMovies4K"></div></div>
+        <div class="section-block"><div class="section-title">YouTube</div><div id="uYoutube"></div></div>
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -141,6 +192,8 @@
   const uTitle = modal.querySelector('#uTitle');
   const uSeries = modal.querySelector('#uSeries');
   const uMovies = modal.querySelector('#uMovies');
+  const uMovies4K = modal.querySelector('#uMovies4K');
+  const uYoutube = modal.querySelector('#uYoutube');
   function open(){ modal.style.display='flex'; document.body.style.overflow='hidden'; }
   function close(){ modal.style.display='none'; document.body.style.overflow=''; }
   closeBtn.addEventListener('click', close);
@@ -189,15 +242,43 @@
         poster: c.querySelector('img')?.src || ''
       };
     });
-    return {series, movies};
+    const movies4k = Array.from(document.querySelectorAll('#movies4kGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
+      const idFromAttr = c.dataset.id || '';
+      let idFromText = '';
+      if(!idFromAttr){
+        const text = Array.from(c.querySelectorAll('.muted')).map(el=>el.textContent).join(' ');
+        const m = text.match(/TMDB ID:\s*(\d+)/i); idFromText = m ? m[1] : '';
+      }
+      return {
+        title: c.querySelector('.title')?.textContent || '',
+        id: idFromAttr || idFromText,
+        poster: c.querySelector('img')?.src || ''
+      };
+    });
+    const youtube = Array.from(document.querySelectorAll('#youtubeGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
+      const idFromAttr = c.dataset.id || '';
+      let idFromText = '';
+      if(!idFromAttr){
+        const text = Array.from(c.querySelectorAll('.muted')).map(el=>el.textContent).join(' ');
+        const m = text.match(/ID:\s*([^\s]+)/i); idFromText = m ? m[1] : '';
+      }
+      return {
+        title: c.querySelector('.title')?.textContent || '',
+        id: idFromAttr || idFromText,
+        poster: 'https://via.placeholder.com/50x75?text=YT'
+      };
+    });
+    return {series, movies, movies4k, youtube};
   }
 
   function openForUser(usernameDisplay){
     const username = usernameDisplay.trim().toLowerCase();
-    const {series, movies} = gatherForUser(username);
+    const {series, movies, movies4k, youtube} = gatherForUser(username);
     uTitle.textContent = `Subscriptions for ${usernameDisplay.trim()}`;
     renderList(uSeries, series);
     renderList(uMovies, movies);
+    renderList(uMovies4K, movies4k);
+    renderList(uYoutube, youtube);
     open();
   }
 

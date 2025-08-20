@@ -1,4 +1,9 @@
-# Subscribarr
+> [!WARNING] 
+> This project was largely written with GitHub Copilot. I apologize to all developers out there for using GitHub Copilot. I’m looking for a competent maintainer. If multiple users rely on it and no maintainer steps up, I’ll level up my Django skills and take it over myself.
+
+<p align="center">
+  <img src="./static/images/logo.png" alt="Subscribarr" width="450" height="150" />
+</p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License MIT"></a>
@@ -20,15 +25,20 @@
 Lightweight web UI for Sonarr/Radarr subscriptions with Jellyfin login, calendar, and flexible notifications via Email, ntfy, and Apprise.
 
 ## Features
-- Sign in with Jellyfin (no separate user store)
+- Sign in with Jellyfin
 - Sonarr/Radarr‑style calendar (upcoming episodes/movies)
 - Subscribe/unsubscribe from the UI (series & movies)
-- Admin overview of all users’ subscriptions with posters
+- Admin overview of all users subscriptions
 - Per‑user notification channels:
   - Email (SMTP)
   - ntfy (Bearer token or Basic Auth)
   - Apprise (Discord, Gotify, Pushover, Webhooks, and many more)
-- Docker‑ready; environment‑driven security (ALLOWED_HOSTS, CSRF, proxy)
+- Docker‑ready
+- Multiple Sonarr/Radarr instances
+- Early‑availability notifications (configurable lookahead)
+- Duplicate suppression per user/item/day and admin tooling (send test, reset tokens)
+- 4K subscriptions: detection across all Radarr instances
+- YouTube subscriptions
 
 ## Screenshots
 <p align="center">
@@ -41,30 +51,78 @@ Lightweight web UI for Sonarr/Radarr subscriptions with Jellyfin login, calendar
 </p>
 
 ## Quickstart (Docker Compose)
-1) Ensure the lockfile matches your Pipfile (e.g., after adding packages):
-```bash
-git clone https://github.com/jschaufuss/subscribarr.git
-cd subscribarr
+
+### Option 1: Direct Access (No Reverse Proxy)
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  subscribarr:
+    image: 10010011/subscribarr:latest
+    container_name: subscribarr
+    ports:
+      - "8081:8000"
+    environment:
+      - DJANGO_ALLOWED_HOSTS=*
+      - DJANGO_SECRET_KEY=change-me
+      - NOTIFICATIONS_ALLOW_DUPLICATES=false
+      - DJANGO_CSRF_TRUSTED_ORIGINS="http://localhost:8081,http://127.0.0.1:8081"
+      # Cron schedule (default every 30min)
+      - CRON_SCHEDULE=*/30 * * * *
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
 ```
-2) run the container:
+
+Run with:
 ```bash
 docker compose up -d
 ```
-3) Open the app and complete the first‑run setup (Jellyfin + Arr URLs/keys).
-```
-http://127.0.0.1:8081
+
+Access at: `http://127.0.0.1:8081`
+
+### Option 2: With Reverse Proxy (Behind Nginx/Traefik)
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  subscribarr:
+    image: 10010011/subscribarr:latest
+    container_name: subscribarr
+    ports:
+      - "8081:8000"
+    environment:
+      - DJANGO_ALLOWED_HOSTS=*
+      - DJANGO_SECRET_KEY=change-me
+      - DJANGO_CSRF_TRUSTED_ORIGINS="https://subscribarr.example.com"
+      - USE_X_FORWARDED_HOST=true
+      - DJANGO_SECURE_PROXY_SSL_HEADER=true
+      - DJANGO_CSRF_COOKIE_SECURE=true
+      - DJANGO_SESSION_COOKIE_SECURE=true
+      # Cron schedule (default every 30min)
+      - CRON_SCHEDULE=*/30 * * * *
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
 ```
 
-Important environment variables (examples):
-- `DJANGO_ALLOWED_HOSTS=subscribarr.example.com,localhost,127.0.0.1`
-- `DJANGO_CSRF_TRUSTED_ORIGINS=https://subscribarr.example.com,http://subscribarr.example.com`
-- Reverse proxy/TLS:
-  - `USE_X_FORWARDED_HOST=true`
-  - `DJANGO_SECURE_PROXY_SSL_HEADER=true`
-  - `DJANGO_CSRF_COOKIE_SECURE=true`
-  - `DJANGO_SESSION_COOKIE_SECURE=true`
+Run with:
+```bash
+docker compose up -d
+```
 
-> Note: `DJANGO_CSRF_TRUSTED_ORIGINS` must include the exact scheme+host (+port if used).
+Replace `https://subscribarr.example.com` with your actual domain.
+
+### Setup
+After starting the container, open the web interface and complete the first‑run setup:
+1. **Jellyfin server**: URL + API key (required)
+2. **Sonarr/Radarr**: URLs + API keys (optional, can add more later)
+
+> **Note**: `DJANGO_CSRF_TRUSTED_ORIGINS` must include the exact scheme+host (+port if used).
 
 ## In‑App Configuration
 - Settings → Jellyfin: server URL + API key
@@ -103,9 +161,16 @@ User URLs are added in addition to global defaults.
 - Fallback: if ntfy/Apprise fail, Subscribarr falls back to Email (when configured).
 
 ## Jobs / Manual Trigger
-- Periodic check via management command (e.g., cron):
+- Periodic check via cron
+- Perform manual check:
 ```bash
 docker exec -it subscribarr python manage.py check_new_media
+```
+```bash
+docker exec -it subscribarr python manage.py check_4k
+```
+```bash
+docker exec -it subscribarr python manage.py check_youtube
 ```
 
 ## Security & Proxy

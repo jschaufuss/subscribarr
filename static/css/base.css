@@ -5,6 +5,9 @@
     --accent: #3b82f6;
     --muted: #9aa0b4;
     --text: #e6e6e6;
+    /* Logo dimensions: increase width for a bigger look without taller navbar */
+    --brand-logo-height: 50px;
+    --brand-logo-width: 150px;
 }
 
 body {
@@ -14,18 +17,17 @@ body {
     margin: 0;
     line-height: 1.5;
 }
-
 .auth-container {
-    max-width: 400px;
-    margin: 40px auto;
-    padding: 20px;
+    max-width: 420px;
+    margin: 64px auto;
+    padding: 0 16px;
 }
 
 .auth-form {
     background: var(--panel);
     border: 1px solid var(--panel-b);
     border-radius: 12px;
-    padding: 20px;
+    padding: 24px;
 }
 
 .auth-form label {
@@ -34,14 +36,18 @@ body {
     color: var(--muted);
 }
 
-.auth-form input:not([type="checkbox"]) {
+.auth-form input:not([type="checkbox"]),
+.auth-form select,
+.auth-form textarea {
+    box-sizing: border-box;
     width: 100%;
-    padding: 8px 12px;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border-radius: 10px;
     border: 1px solid #2a2a34;
     background: #111119;
     color: var(--text);
     margin-bottom: 16px;
+    font-size: 1rem;
 }
 
 .auth-form input:focus {
@@ -51,7 +57,7 @@ body {
 
 .btn-primary {
     display: inline-block;
-    padding: 10px 20px;
+    padding: 12px 20px;
     background: var(--accent);
     color: #fff;
     border: none;
@@ -86,6 +92,10 @@ body {
     list-style: none;
 }
 
+.auth-header { margin-bottom: 12px; text-align: center; }
+.auth-title { margin: 0 0 4px; font-size: 1.4rem; }
+.auth-subtitle { margin: 0 0 16px; color: var(--muted); font-size: 0.95rem; }
+
 .helptext {
     display: block;
     font-size: 0.9rem;
@@ -107,11 +117,54 @@ body {
     align-items: center;
 }
 
+/* Desktop sidebar layout */
+.sidebar { display: none; }
+.content { padding: 0 16px; }
+
+@media (min-width: 1024px) {
+    .main-nav { display: none; }
+    .sidebar { display: block; position: fixed; top: 0; left: 0; bottom: 0; width: 256px; background: var(--panel); border-right: 1px solid var(--panel-b); }
+    .sidebar-inner { display: flex; flex-direction: column; height: 100%; padding: 16px; gap: 16px; }
+    .sidebar .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-weight: 700; font-size: 1.1rem; }
+    .sidebar .side-links { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .sidebar .side-links a { color: var(--text); text-decoration: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); display: flex; align-items: center; gap: 8px; }
+    .sidebar .side-links a:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; }
+    .sidebar .calendar-link { display: block; text-decoration: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); color: var(--text); font-weight: 600; }
+    .sidebar .calendar-link:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .side-footer { border-top: 2px solid rgba(255,255,255,0.16); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .sidebar .side-auth { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .sidebar .side-auth .inline-form { margin: 0; }
+    .sidebar .side-auth .btn-link { padding: 8px 14px; min-width: 110px; text-align: center; border-radius: 10px; }
+    .sidebar .side-action { color: var(--text); text-align: left; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--panel-b); background: rgba(255,255,255,0.02); text-decoration: none; }
+    .sidebar .side-action:hover { background: rgba(255,255,255,0.08); }
+    .sidebar .signed-in { color: var(--muted); line-height: 1.2; }
+    .content { margin-left: 256px; padding: 16px; }
+}
+
 .nav-brand {
     color: var(--text);
     text-decoration: none;
     font-weight: 600;
     font-size: 1.2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-logo {
+    height: var(--brand-logo-height);
+    width: var(--brand-logo-width);
+    border-radius: 4px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+@media (max-width: 520px) {
+    :root {
+        --brand-logo-height: 36px;
+        --brand-logo-width: 130px;
+    }
 }
 
 .nav-links {
@@ -179,3 +232,6 @@ body {
 .nav-admin {
     color: var(--accent) !important;
 }
+
+/* Generic helpers */
+.muted { color: var(--muted); }

@@ -6,19 +6,11 @@ from django.views.generic.edit import CreateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import login
 from django.conf import settings
-from .forms import CustomUserCreationForm, CustomUserChangeForm, JellyfinLoginForm
+from .forms import CustomUserChangeForm, JellyfinLoginForm
 from .models import User
 from .utils import JellyfinClient
 
-class RegisterView(CreateView):
-    form_class = CustomUserCreationForm
-    template_name = 'accounts/register.html'
-    success_url = reverse_lazy('accounts:login')
-    
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        messages.success(self.request, 'Registration successful! You can now sign in.')
-        return response
+# Registration is disabled: Jellyfin SSO only.
 
 @login_required
 def profile(request):
@@ -34,16 +26,61 @@ def profile(request):
     # Load subscriptions
     series_subs = request.user.series_subscriptions.all()
     movie_subs = request.user.movie_subscriptions.all()
+    movie4k_subs = request.user.movie4k_subscriptions.all().order_by('title')
+    yt_subs = request.user.yt_subscriptions.all().order_by('kind', 'title')
+    # Enrich with metadata (title/image/url) best-effort
+    yt_items = []
+    try:
+        from youtube.services import get_youtube_metadata
+        for s in yt_subs:
+            meta = {}
+            try:
+                meta = get_youtube_metadata(s.kind, s.target_id) or {}
+            except Exception:
+                meta = {}
+            yt_items.append({'sub': s, 'meta': meta})
+    except Exception:
+        yt_items = [{'sub': s, 'meta': {}} for s in yt_subs]
 
     # Best-effort Backfill fehlender Poster, damit die Profilseite Bilder zeigt
     try:
-        from settingspanel.models import AppSettings
-        from arr_api.services import sonarr_get_series, radarr_lookup_movie_by_title
+        from settingspanel.models import AppSettings, ArrInstance
+        from arr_api.services import (
+            sonarr_get_series,
+            radarr_lookup_movie_by_title,
+            radarr_lookup_movie_by_tmdb_id,
+        )
         cfg = AppSettings.current()
+        # choose any enabled instance if legacy fields are not set
+        sonarr_conf = None
+        radarr_conf = None
+        try:
+            if cfg.sonarr_url and cfg.sonarr_api_key:
+                sonarr_conf = (cfg.sonarr_url, cfg.sonarr_api_key)
+            else:
+                inst = ArrInstance.objects.filter(enabled=True, kind='sonarr').order_by('order','id').first()
+                if inst:
+                    sonarr_conf = (inst.base_url, inst.api_key)
+        except Exception:
+            sonarr_conf = None
+        try:
+            if cfg.radarr_url and cfg.radarr_api_key:
+                radarr_conf = (cfg.radarr_url, cfg.radarr_api_key)
+            else:
+                inst = ArrInstance.objects.filter(enabled=True, kind='radarr').order_by('order','id').first()
+                if inst:
+                    radarr_conf = (inst.base_url, inst.api_key)
+        except Exception:
+            radarr_conf = None
     # Series
         for sub in series_subs:
             if not sub.series_poster and sub.series_id:
-                details = sonarr_get_series(sub.series_id, base_url=cfg.sonarr_url, api_key=cfg.sonarr_api_key)
+                details = None
+                try:
+                    if sonarr_conf:
+                        details = sonarr_get_series(sub.series_id, base_url=sonarr_conf[0], api_key=sonarr_conf[1])
+                except Exception:
+                    details = None
                 if details and details.get('series_poster'):
                     sub.series_poster = details['series_poster']
                     if not sub.series_overview:
@@ -54,7 +91,12 @@ def profile(request):
     # Movies
         for sub in movie_subs:
             if not sub.poster:
-                details = radarr_lookup_movie_by_title(sub.title, base_url=cfg.radarr_url, api_key=cfg.radarr_api_key)
+                details = None
+                try:
+                    if radarr_conf:
+                        details = radarr_lookup_movie_by_title(sub.title, base_url=radarr_conf[0], api_key=radarr_conf[1])
+                except Exception:
+                    details = None
                 if details and details.get('poster'):
                     sub.poster = details['poster']
                     if not sub.overview:
@@ -62,6 +104,27 @@ def profile(request):
                     if not sub.genres:
                         sub.genres = details.get('genres') or []
                     sub.save(update_fields=['poster', 'overview', 'genres'])
+    # Movies 4K
+        for sub in movie4k_subs:
+            details = None
+            try:
+                if radarr_conf and getattr(sub, 'tmdb_id', None):
+                    details = radarr_lookup_movie_by_tmdb_id(sub.tmdb_id, base_url=radarr_conf[0], api_key=radarr_conf[1])
+            except Exception:
+                details = None
+            if details:
+                # Always attach overview transiently for display (model has no field)
+                sub.overview = details.get('overview') or ''
+                # Persist poster/title if missing
+                fields = []
+                if not sub.poster and details.get('poster'):
+                    sub.poster = details['poster']
+                    fields.append('poster')
+                if (not sub.title) and details.get('title'):
+                    sub.title = details.get('title')
+                    fields.append('title')
+                if fields:
+                    sub.save(update_fields=fields)
     except Exception:
         # still show page even if lookups fail
         pass
@@ -70,6 +133,9 @@ def profile(request):
         'form': form,
         'series_subs': series_subs,
         'movie_subs': movie_subs,
+    'movie4k_subs': movie4k_subs,
+    'yt_subs': yt_subs,
+    'yt_items': yt_items,
     })
 
 def jellyfin_login(request):

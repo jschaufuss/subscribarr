@@ -1,22 +1,14 @@
+{% extends "base.html" %}
 {% load static %}
-<!doctype html>
-<html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Settings – Subscribarr</title>
-    <link rel="stylesheet" href="{% static 'css/settings.css' %}">
-</head>
-
-<body>
+{% block title %}Settings – Subscribarr{% endblock %}
+{% block extra_style %}<link rel="stylesheet" href="{% static 'css/settings.css' %}">{% endblock %}
+{% block content %}
     <div class="wrap">
         <div class="topbar">
             <div style="display:flex; gap:8px; align-items:center;">
-                <a href="/" class="btn">← Back</a>
                 <a href="{% url 'settingspanel:subscriptions' %}" class="btn">👥 Subscriptions</a>
             </div>
-            <div><strong>Settings</strong></div>
+            <div></div>
             <div></div>
         </div>
 
@@ -24,7 +16,7 @@
         <div class="msgs">{% for m in messages %}<div class="msg">{{ m }}</div>{% endfor %}</div>
         {% endif %}
 
-        <form method="post">
+    <form method="post">
             {% csrf_token %}
             <div class="grid">
                 <div class="card">
@@ -39,45 +31,72 @@
                         {{ jellyfin_form.jellyfin_api_key }}
                         <div class="help">Admin API key from your Jellyfin settings</div>
                     </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
                 <div class="card">
                     <h2>Sonarr & Radarr</h2>
+                    <div class="help">You can add multiple Sonarr/Radarr instances (e.g., 1080p, 4K, Anime).</div>
 
-                    <div class="row">
-                        <label>Sonarr URL</label>
-                        <div class="inline">
-                            <div class="field">{{ arr_form.sonarr_url }}</div>
-                            <div class="inline-actions">
-                                <button class="btn" type="button" onclick="testConnection('sonarr', this)">Test Sonarr</button>
-                                <span id="sonarrStatus" class="badge muted">—</span>
+                    {{ arr_instances.management_form }}
+                    <div id="arr-instances">
+                        {% for form in arr_instances %}
+                        <div class="arr-row collapsed">
+                            {{ form.id }}
+                            <div class="arr-header" onclick="toggleArrRow(this)">
+                                <div class="arr-title">
+                                    <strong class="arr-name">{{ form.instance.name|default:form.name.value|default:"(new)" }}</strong>
+                                    <span class="arr-kind"> — {{ form.instance.get_kind_display|default:form.kind.value }}</span>
+                                    <span class="badge small arr-enabled">{{ form.instance.enabled|yesno:"Enabled,Disabled" }}</span>
+                                </div>
+                                <div class="arr-toggle" onclick="event.stopPropagation()">
+                                    <label style="display:inline-flex;align-items:center;gap:6px;">
+                                        {{ form.enabled }} <span>Enabled</span>
+                                    </label>
+                                </div>
+                                <div class="arr-chevron" aria-hidden>▾</div>
+                            </div>
+                            <div class="arr-body">
+                                <div class="row">
+                                    <label>Type</label>{{ form.kind }}
+                                </div>
+                                <div class="row">
+                                    <label>Name</label>{{ form.name }}
+                                </div>
+                                <div class="row">
+                                    <label>Base URL</label>{{ form.base_url }}
+                                    <div class="help">Use the app root URL, e.g. http://host:7878 (Radarr) or http://host:8989 (Sonarr). Avoid /settings or /api paths.</div>
+                                </div>
+                                <div class="row">
+                                    <label>API Key</label>{{ form.api_key }}
+                                </div>
+                                <div class="row inline">
+                                    <label>Order</label>
+                                    <div class="field">
+                                        {{ form.order }}
+                                    </div>
+                                    <div class="inline-actions">
+                                        <button class="btn" type="button" onclick="testSpecific(this)">Test</button>
+                                        <span style="display:none;visibility:hidden;">{{ form.DELETE }}</span>
+                                        <button class="btn" type="button" onclick="removeRow(this)">Remove</button>
+                                    </div>
+                                </div>
+                                
                             </div>
                         </div>
+                        {% empty %}
+                        <div class="help">No instances yet. Use “Add instance”.</div>
+                        {% endfor %}
                     </div>
-
-                    <div class="row">
-                        <label>Sonarr API Key</label>
-                        {{ arr_form.sonarr_api_key }}
+                    <div>
+                        <button class="btn" type="button" onclick="addInstance()">+ Add instance</button>
                     </div>
-
-
-                    <div class="row">
-                        <label>Radarr URL</label>
-                        <div class="inline">
-                            <div class="field">{{ arr_form.radarr_url }}</div>
-                            <div class="inline-actions">
-                                <button class="btn" type="button" onclick="testConnection('radarr', this)">Test Radarr</button>
-                                <span id="radarrStatus" class="badge muted">—</span>
-                            </div>
-                        </div>
+                    <div class="help">Click “Test” to verify against /api/v3/system/status.</div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
                     </div>
-
-                    <div class="row">
-                        <label>Radarr API Key</label>
-                        {{ arr_form.radarr_api_key }}
-                    </div>
-
-                    <div class="help">Click “Test …” to verify against <code>/api/v3/system/status</code>.</div>
                 </div>
 
                 <div class="card">
@@ -88,55 +107,177 @@
                     <div class="row"><label>User</label>{{ mail_form.mail_user }}</div>
                     <div class="row"><label>Password</label>{{ mail_form.mail_password }}</div>
                     <div class="row"><label>From</label>{{ mail_form.mail_from }}</div>
+                    <div class="row">
+                        <label>Test email</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('email', this)">Send test email</button>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
                 <div class="card">
-                    <h2>Notifications</h2>
-                    <h3>ntfy</h3>
+                    <h2>Notifications — ntfy</h2>
                     <div class="row"><label>Server URL</label>{{ notify_form.ntfy_server_url }}</div>
                     <div class="row"><label>Default topic</label>{{ notify_form.ntfy_topic_default }}</div>
                     <div class="row"><label>Username</label>{{ notify_form.ntfy_user }}</div>
                     <div class="row"><label>Password</label>{{ notify_form.ntfy_password }}</div>
                     <div class="row"><label>Bearer token</label>{{ notify_form.ntfy_token }}</div>
-
-                    <h3 style="margin-top:12px;">Apprise</h3>
-                    <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
-                    <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
+                    <div class="row">
+                        <label>Test ntfy</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('ntfy', this)">Send test ntfy</button>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
 
                 <div class="card">
-                    <h2>Account</h2>
-                    <div class="row"><label>Username</label>{{ account_form.username }}</div>
-                    <div class="row"><label>Email</label>{{ account_form.email }}</div>
-                    <div class="row"><label>New password</label>{{ account_form.new_password }}</div>
-                    <div class="row"><label>Repeat password</label>{{ account_form.repeat_password }}</div>
-                    <div class="help">Only UI – implementing password change later.</div>
+                    <h2>Notification behavior</h2>
+                    <div class="row">
+                        <label>Lookahead (days)</label>
+                        {{ notify_form.notify_lookahead_days }}
+                        <div class="help">Notify early if file is already available up to N days before the official date. Applies to Series and Movies.</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
                 </div>
+
+                <div class="card">
+                    <h2>Notifications — Apprise</h2>
+                    <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
+                    <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>
+                    <div class="row">
+                        <label>Test Apprise</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="testNotify('apprise', this)">Send test apprise</button>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </div>
+
+                <div class="card" style="border-color:#6f1f2a;">
+                    <h2>Destructive actions</h2>
+                    <div class="help">Danger zone: these actions delete notification tokens with air dates from today up to your lookahead window, so early events can be re-sent during testing.</div>
+                    <div class="row">
+                        <label>Reset tokens</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="resetNotify('me', this)">Clear my tokens</button>
+                            <button class="btn" type="button" onclick="resetNotify('all', this)">Clear all tokens</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Account management removed: Jellyfin-only auth -->
             </div>
 
-            <div style="margin-top:16px">
-                <button class="btn btn-primary" type="submit">Save</button>
-            </div>
+            
         </form>
     </div>
 
     <script>
-
-        function testConnection(kind) {
-            const url = document.querySelector(`input[name="${kind}_url"]`).value;
-            const key = document.querySelector(`input[name="${kind}_api_key"]`).value;
-
-            fetch(`/settings/test-connection/?kind=${kind}&url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.ok) {
-            alert(kind + " connection successful!");
-                    } else {
-            alert(kind + " error: " + data.error);
-                    }
-                })
-        .catch(err => alert(kind + " error: " + err));
+        // Update header text from inputs
+        function updateArrHeader(row){
+            const name = row.querySelector('[name$="-name"]');
+            const kind = row.querySelector('[name$="-kind"]');
+            const enabled = row.querySelector('[name$="-enabled"]');
+            row.querySelector('.arr-name').textContent = (name && name.value.trim()) || '(new)';
+            const kindLabel = kind && kind.options[kind.selectedIndex] ? kind.options[kind.selectedIndex].text : '';
+            row.querySelector('.arr-kind').textContent = kindLabel ? ` — ${kindLabel}` : '';
+            if (enabled){ row.querySelector('.arr-enabled').textContent = enabled.checked ? 'Enabled' : 'Disabled'; }
         }
+
+        function toggleArrRow(el){
+            const row = el.closest('.arr-row');
+            if(!row) return;
+            row.classList.toggle('collapsed');
+        }
+
+        // Template for new instance row (collapsible)
+        function addInstance() {
+            const container = document.getElementById('arr-instances');
+            const totalEl = document.querySelector('#id_form-TOTAL_FORMS');
+            const index = parseInt(totalEl.value, 10);
+
+            const html = `
+                <div class="arr-row">
+                    <div class="arr-header" onclick="toggleArrRow(this)">
+                        <div class="arr-title">
+                            <strong class="arr-name">(new)</strong>
+                            <span class="arr-kind"></span>
+                            <span class="badge small arr-enabled">Enabled</span>
+                        </div>
+                        <div class="arr-toggle" onclick="event.stopPropagation()">
+                            <label style="display:inline-flex;align-items:center;gap:6px;">
+                                <input type="checkbox" name="form-${index}-enabled" checked> <span>Enabled</span>
+                            </label>
+                        </div>
+                        <div class="arr-chevron" aria-hidden>▾</div>
+                    </div>
+                    <div class="arr-body">
+                        <div class="row"><label>Type</label>
+                            <select name="form-${index}-kind" class="input-wide">
+                                <option value="sonarr">Sonarr</option>
+                                <option value="radarr">Radarr</option>
+                            </select>
+                        </div>
+                        <div class="row"><label>Name</label><input type="text" name="form-${index}-name" class="input-wide"></div>
+                        <div class="row"><label>Base URL</label><input type="url" name="form-${index}-base_url" class="input-wide" placeholder="http://host:8989 or https://example.com/radarr"><div class="help">Use the app root URL. Avoid /settings or /api paths.</div></div>
+                        <div class="row"><label>API Key</label><input type="password" name="form-${index}-api_key" class="input-wide"></div>
+                        <div class="row inline">
+                            <label>Order</label>
+                            <div class="field">
+                                <input type="number" name="form-${index}-order" value="${index}" class="input-wide" min="0">
+                            </div>
+                            <div class="inline-actions">
+                                <button class="btn" type="button" onclick="testSpecific(this)">Test</button>
+                                <input type="checkbox" name="form-${index}-DELETE" style="display:none;" />
+                                <button class="btn" type="button" onclick="removeRow(this)">Remove</button>
+                            </div>
+                        </div>
+                        <input type="hidden" name="form-${index}-id" />
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+            totalEl.value = index + 1;
+            const row = container.lastElementChild;
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(el=> {
+                el.addEventListener('input', ()=>updateArrHeader(row));
+                el.addEventListener('change', ()=>updateArrHeader(row));
+            });
+            updateArrHeader(row);
+        }
+
+        function removeRow(btn){
+            const row = btn.closest('.arr-row');
+            if(!row) return;
+            const del = row.querySelector('input[name$="-DELETE"]');
+            if(del){
+                del.checked = true;
+                row.style.display = 'none';
+            } else {
+                row.remove();
+            }
+        }
+
+        // Wire up existing rows so header reflects changes immediately
+        document.addEventListener('DOMContentLoaded', function(){
+            document.querySelectorAll('.arr-row').forEach(function(row){
+                const inputs = row.querySelectorAll('input, select');
+                inputs.forEach(function(el){
+                    el.addEventListener('input', function(){ updateArrHeader(row); });
+                    el.addEventListener('change', function(){ updateArrHeader(row); });
+                });
+                updateArrHeader(row);
+            });
+        });
 
         function setBadge(kind, state, text, tooltip) {
             const el = document.getElementById(kind + "Status");
@@ -168,17 +309,55 @@
                 .then(r => r.json())
                 .then(data => {
                     if (data.ok) {
-            setBadge(kind, "ok", "Connected", "");
+                        setBadge(kind, "ok", "Connected", "");
                     } else {
-            setBadge(kind, "err", "Error", data.error || "Unknown error");
+                        setBadge(kind, "err", "Error", data.error || "Unknown error");
                     }
                 })
-        .catch(err => setBadge(kind, "err", "Error", String(err)))
+                .catch(err => setBadge(kind, "err", "Error", String(err)))
                 .finally(() => { if (btnEl) btnEl.disabled = false; });
         }
 
+        function testSpecific(btn){
+            const row = btn.closest('.arr-row');
+            const kind = (row.querySelector('[name$="-kind"]').value||'').trim();
+            const url = (row.querySelector('[name$="-base_url"]').value||'').trim();
+            const key = (row.querySelector('[name$="-api_key"]').value||'').trim();
+            if(!kind || !url || !key){
+                alert('Please fill kind, URL and API key first.');
+                return;
+            }
+            fetch(`/settings/test-connection/?kind=${encodeURIComponent(kind)}&url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`)
+                .then(r=>r.json())
+                .then(data=>{
+                    if(data.ok) alert(kind + ' connection successful!');
+                    else alert(kind + ' error: ' + (data.error || 'Unknown error') + '\nCheck base URL (http(s)://host:port) and API key.');
+                })
+                .catch(err=>alert(kind + ' error: ' + String(err)));
+        }
+
+        function testNotify(channel, btn){
+            if(btn) btn.disabled = true;
+            fetch(`/settings/test-notify/?channel=${encodeURIComponent(channel)}`)
+                .then(r=>r.json())
+                .then(data=>{
+                    if(data.ok) alert(`Test ${channel} sent.`);
+                    else alert(`Test ${channel} failed: ${data.error||'Unknown error'}`);
+                })
+                .catch(err=>alert(`Test ${channel} error: ${String(err)}`))
+                .finally(()=>{ if(btn) btn.disabled=false; });
+        }
+
+        function resetNotify(scope, btn){
+            if(btn) btn.disabled = true;
+            fetch(`/settings/reset-notify-tokens/?scope=${encodeURIComponent(scope)}`)
+                .then(r=>r.json())
+                .then(data=>{
+                    if(data.ok) alert(`Cleared ${data.deleted||0} token(s).`);
+                    else alert(`Reset failed: ${data.error||'Unknown error'}`);
+                })
+                .catch(err=>alert(`Reset error: ${String(err)}`))
+                .finally(()=>{ if(btn) btn.disabled=false; });
+        }
     </script>
-
-</body>
-
-</html>
+{% endblock %}
