@@ -408,6 +408,17 @@ def check_and_notify_users():
                         ).delete()
                     except Exception:
                         pass
+                else:
+                    # Auto-unsubscribe if series ended (no more releases expected)
+                    try:
+                        for inst in _enabled_instances('sonarr'):
+                            s = _sonarr_get(inst.base_url, inst.api_key, f"/api/v3/series/{sub.series_id}") or {}
+                            status = (s.get('status') or '').lower()
+                            if status == 'ended':
+                                sub.delete()
+                                break
+                    except Exception:
+                        pass
 
     # Film-Abos
     for sub in MovieSubscription.objects.select_related('user').all():
@@ -436,65 +447,31 @@ def check_and_notify_users():
         if event_date and getattr(sub, 'created_at', None) and sub.created_at.date() > event_date:
             continue
 
-        # Early availability: notify immediately if file present (within lookahead window fetch)
-        if radarr_movie_has_file(sub.movie_id):
-            # detect which release matched today
-            rel = None
+        
+
+    # Cleanup lingering subs: ended series and movies already available
+    try:
+        for sub in SeriesSubscription.objects.select_related('user').all():
             try:
-                for key, name in (("digitalRelease", "Digital"), ("physicalRelease", "Disc"), ("inCinemas", "Kino")):
-                    v = it.get(key)
-                    if not v:
-                        continue
-                    d = isoparse(v).date()
-                    if d == (event_date or today):
-                        rel = name
+                for inst in _enabled_instances('sonarr'):
+                    s = _sonarr_get(inst.base_url, inst.api_key, f"/api/v3/series/{sub.series_id}") or {}
+                    status = (s.get('status') or '').lower()
+                    if status == 'ended':
+                        sub.delete()
                         break
             except Exception:
-                pass
-
-            subj = f"New movie available: {sub.title}"
-            if rel:
-                subj += f" ({rel})"
-            body = f"{sub.title} is now available."
-            html = None
+                continue
+    except Exception:
+        pass
+    try:
+        for sub in MovieSubscription.objects.select_related('user').all():
             try:
-                ctx = {
-                    'username': sub.user.username,
-                    'title': sub.title,
-                    'type': 'Film',
-                    'overview': sub.overview,
-                    'poster_url': it.get('posterUrl'),
-                    'year': it.get('year'),
-                    'release_type': rel,
-                }
-                html = render_to_string('arr_api/email/new_media_notification.html', ctx)
-            except Exception:
-                pass
-            # Reserve duplicate token per movie atomically, then dispatch; rollback on failure
-            try:
-                with transaction.atomic():
-                    token, created = SentNotification.objects.get_or_create(
-                        user=sub.user,
-                        media_id=sub.movie_id,
-                        media_type='movie',
-                        air_date=(event_date or today),
-                        defaults={'media_title': sub.title}
-                    )
-                if not created:
-                    continue
+                if radarr_movie_has_file(sub.movie_id):
+                    sub.delete()
             except Exception:
                 continue
-            ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
-            if not ok:
-                try:
-                    SentNotification.objects.filter(
-                        user=sub.user,
-                        media_id=sub.movie_id,
-                        media_type='movie',
-                        air_date=(event_date or today)
-                    ).delete()
-                except Exception:
-                    pass
+    except Exception:
+        pass
 
 
 def has_new_episode_today(series_id):

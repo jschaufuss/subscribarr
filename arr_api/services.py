@@ -333,7 +333,7 @@ def list_movies_missing_4k_across_instances() -> list[dict]:
                         poster = img.get('remoteUrl') or _abs_url(inst.base_url, img.get('url'))
                         if poster:
                             break
-                movies_by_tmdb[tmdb] = {
+                cur = {
                     'tmdbId': tmdb,
                     'title': m.get('title'),
                     'year': m.get('year'),
@@ -341,9 +341,14 @@ def list_movies_missing_4k_across_instances() -> list[dict]:
                     'overview': m.get('overview') or '',
                     '_has4k': False,
                 }
-        # Check 4K availability in this instance (cached)
-        if _movie_has_4k_in_instance_cached(inst, m.get('id')):
-                movies_by_tmdb[tmdb]['_has4k'] = True
+            # Check 4K availability for this movie in this instance (cached)
+            mid = m.get('id')
+            try:
+                if mid and _movie_has_4k_in_instance_cached(inst, mid):
+                    cur['_has4k'] = True
+            except Exception:
+                pass
+            movies_by_tmdb[tmdb] = cur
     # Return only those that do not have 4K anywhere
     result = [v for v in movies_by_tmdb.values() if not v.get('_has4k')]
     cache.set(cache_key, result, M4K_LIST_TTL)

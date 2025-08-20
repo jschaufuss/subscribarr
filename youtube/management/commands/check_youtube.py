@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.db import transaction
 from youtube.models import YouTubeSubscription, YTSentNotification
 from youtube.services import build_feed_url, fetch_feed_entries
+from django.template.loader import render_to_string
 from arr_api.notifications import _dispatch_user_notification
 
 
@@ -58,8 +59,27 @@ class Command(BaseCommand):
                 channel = ent.get('channel_title') or ''
                 url = ent.get('url') or f'https://www.youtube.com/watch?v={vid}'
                 subj = f"New YouTube video: {title}"
+                # Render using the same rich template (use 'Film' type semantics)
+                html = None
+                try:
+                    ctx = {
+                        'username': sub.user.username,
+                        'title': title,
+                        'type': 'YouTube',
+                        'overview': channel,
+                        'poster_url': ent.get('thumb') or '',
+                        'episode_title': None,
+                        'season': None,
+                        'episode': None,
+                        'air_date': ent.get('published'),
+                        'year': None,
+                        'release_type': 'Video',
+                    }
+                    html = render_to_string('arr_api/email/new_media_notification.html', ctx)
+                except Exception:
+                    html = None
                 body = f"{title}\n{channel}\n{url}"
-                ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=None, click_url=url)
+                ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html, click_url=url)
                 if ok:
                     count_notified += 1
                 else:
