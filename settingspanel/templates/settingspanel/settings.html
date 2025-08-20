@@ -136,15 +136,12 @@
                     </div>
                 </div>
 
-                <div class="card" style="border-color:#6f1f2a;">
-                    <h2>Destructive actions</h2>
-                    <div class="help">Danger zone: these actions delete notification tokens with air dates from today up to your lookahead window, so early events can be re-sent during testing.</div>
+                <div class="card">
+                    <h2>Notification behavior</h2>
                     <div class="row">
-                        <label>Reset tokens</label>
-                        <div class="inline-actions">
-                            <button class="btn" type="button" onclick="resetNotify('me', this)">Clear my tokens</button>
-                            <button class="btn" type="button" onclick="resetNotify('all', this)">Clear all tokens</button>
-                        </div>
+                        <label>Lookahead (days)</label>
+                        {{ notify_form.notify_lookahead_days }}
+                        <div class="help">Notify early if file is already available up to N days before the official date. Applies to Series and Movies.</div>
                     </div>
                     <div class="card-actions">
                         <button class="btn btn-primary" type="submit">Save</button>
@@ -165,15 +162,16 @@
                         <button class="btn btn-primary" type="submit">Save</button>
                     </div>
                 </div>
-                <div class="card">
-                    <h2>Notification behavior</h2>
+
+                <div class="card" style="border-color:#6f1f2a;">
+                    <h2>Destructive actions</h2>
+                    <div class="help">Danger zone: these actions delete notification tokens with air dates from today up to your lookahead window, so early events can be re-sent during testing.</div>
                     <div class="row">
-                        <label>Lookahead (days)</label>
-                        {{ notify_form.notify_lookahead_days }}
-                        <div class="help">Notify early if file is already available up to N days before the official date. Applies to Series and Movies.</div>
-                    </div>
-                    <div class="card-actions">
-                        <button class="btn btn-primary" type="submit">Save</button>
+                        <label>Reset tokens</label>
+                        <div class="inline-actions">
+                            <button class="btn" type="button" onclick="resetNotify('me', this)">Clear my tokens</button>
+                            <button class="btn" type="button" onclick="resetNotify('all', this)">Clear all tokens</button>
+                        </div>
                     </div>
                 </div>
                 <!-- Account management removed: Jellyfin-only auth -->
