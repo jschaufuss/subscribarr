@@ -69,9 +69,8 @@ def send_notification_email(
     year=None,
     release_type=None,
 ):
-    """
-    Sendet eine Benachrichtigungs-E-Mail an einen User mit erweiterten Details
-    """
+    """Send a notification email to a user (series / movie / 4K / YouTube).
+    All content is kept in English for consistency."""
     eff = _set_runtime_email_settings()
     logger.info(
         "Email settings: host=%s port=%s tls=%s ssl=%s from=%s auth_user_set=%s",
@@ -89,14 +88,16 @@ def send_notification_email(
                 dt = dt.astimezone(tz)
             except Exception:
                 pass
-            air_date_str = dt.strftime('%d.%m.%Y %H:%M')
+            # Use ISO-like readable format (24h) e.g. 2025-09-02 18:30
+            air_date_str = dt.strftime('%Y-%m-%d %H:%M')
         except Exception:
             air_date_str = str(air_date)
 
+    media_kind = 'Series' if media_type == 'series' else 'Movie'
     context = {
         'username': user.username,
         'title': media_title,
-        'type': 'Serie' if media_type == 'series' else 'Film',
+        'type': media_kind,
         'overview': overview,
         'poster_url': poster_url,
         'episode_title': episode_title,
@@ -107,7 +108,11 @@ def send_notification_email(
         'release_type': release_type,
     }
 
-    subject = f"Neue {context['type']} verfügbar: {media_title}"
+    if media_kind == 'Series' and season is not None and episode is not None:
+        subj_detail = f"S{season:02d}E{episode:02d}"
+        subject = f"New episode available: {media_title} {subj_detail}"
+    else:
+        subject = f"New {media_kind.lower()} available: {media_title}"
     message = render_to_string('arr_api/email/new_media_notification.html', context)
 
     # Fallback to dispatch respecting user preference
@@ -318,7 +323,7 @@ def check_and_notify_users():
     """
     from .models import SeriesSubscription, MovieSubscription, SentNotification
 
-    # calendars for today (für frühe Benachrichtigungen)
+    # Calendars for today (for early notifications)
     cfg = AppSettings.current()
     la = max(0, int(getattr(cfg, 'notify_lookahead_days', 1) or 0))
     todays_series = get_todays_sonarr_calendar(lookahead_days=la)
@@ -336,12 +341,12 @@ def check_and_notify_users():
 
     today = timezone.now().date()
 
-    # Serien-Abos: Prüfe ALLE Subscriptions auf neue verfügbare Episoden
+    # Series subscriptions: iterate over all to detect new available episodes
     for sub in SeriesSubscription.objects.select_related('user').all():
-        # Hole alle Episoden für diese Serie von Sonarr
+    # Fetch all episodes for this series from Sonarr
         episodes_to_check = []
         
-        # 1. Prüfe Kalender-Episoden (frühe Benachrichtigungen)
+    # 1. Check calendar episodes (early notifications)
         if sub.series_id in series_idx:
             episodes_to_check.extend(series_idx[sub.series_id])
         
