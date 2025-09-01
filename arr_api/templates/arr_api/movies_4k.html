@@ -6,7 +6,14 @@
 {% block extra_style %}
 <link rel="stylesheet" href="{% static 'css/index.css' %}">
 <style>
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+.grid-cards { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+    gap: 16px; 
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
 /* Constrain content matching other pages */
 .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
 .card { position: relative; background: var(--card-bg, #111); border: 1px solid var(--border, #333); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; }
@@ -39,6 +46,131 @@
   .grid-cards { grid-template-columns: 1fr; gap: 12px; }
   .card img { height: 260px; }
 }
+
+/* Bulk Edit Styles for 4K */
+#bulk-edit-btn-4k {
+    background: var(--accent, #3b82f6);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+#bulk-edit-btn-4k:hover {
+    background: #2563eb;
+}
+
+#bulk-actions-4k {
+    background: var(--panel, #12121a);
+    border: 1px solid var(--border, #333);
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+#bulk-actions-4k .bulk-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#bulk-actions-4k .btn {
+    margin: 0;
+    padding: 10px 16px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background: var(--accent, #3b82f6);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: var(--btn-bg, #1e1e1e);
+    color: var(--text, #e6e6e6);
+    border: 1px solid var(--border, #333);
+}
+
+.btn-secondary:hover {
+    background: #374151;
+    border-color: rgba(255,255,255,0.2);
+}
+
+.btn-outline {
+    background: transparent;
+    color: var(--muted, #aaa);
+    border: 1px solid var(--muted, #aaa);
+}
+
+.btn-outline:hover {
+    background: var(--btn-bg, #1e1e1e);
+    color: var(--text, #e6e6e6);
+    border-color: var(--text, #e6e6e6);
+}
+
+#selection-counter-4k {
+    font-weight: 600;
+    color: var(--accent, #3b82f6);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+}
+
+.bulk-checkbox-4k {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    background: rgba(0,0,0,0.8);
+    border-radius: 4px;
+    padding: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.bulk-checkbox-4k input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent, #3b82f6);
+}
+.bulk-selected { outline: 3px solid var(--accent,#3b82f6); outline-offset:1px; box-shadow:0 0 0 2px rgba(59,130,246,0.3); }
+@media (max-width:640px){
+    #bulk-actions-4k{flex-direction:column;align-items:stretch;}
+    #bulk-actions-4k .bulk-buttons{flex-wrap:wrap;width:100%;}
+    #bulk-actions-4k .bulk-buttons .btn{flex:1 1 48%;min-width:48%;padding:12px 10px;}
+    #selection-counter-4k{justify-content:center;margin-bottom:6px;}
+    .bulk-checkbox-4k{top:6px;left:6px;padding:4px;}
+    .bulk-checkbox-4k input[type=checkbox]{width:22px;height:22px;}
+}
 </style>
 {% endblock %}
 
@@ -47,6 +179,9 @@
   <h1>4K</h1>
   <p class="muted">Movies known across your Radarr instances that currently do not have a 4K file anywhere. Subscribe to get notified once 4K appears on any instance.</p>
   <div class="toolbar" style="justify-content: flex-end;">
+    <div class="controls-actions" style="margin-right: auto;">
+        <button type="button" id="bulk-edit-btn-4k">📋 Bulk Edit</button>
+    </div>
     <form method="get" action="" class="toolbar-form">
       <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Search…" style="padding:8px 10px;border-radius:8px;border:1px solid #2a2a34;background:#111119;color:#e6e6e6;min-width:220px;">
       <select name="pp" style="padding:8px 10px;border-radius:8px;border:1px solid #2a2a34;background:#111119;color:#e6e6e6;">
@@ -68,11 +203,30 @@
       </div>
     </form>
   </div>
+
+  <!-- Bulk Actions Bar for 4K (hidden by default) -->
+  <div id="bulk-actions-4k">
+      <div class="bulk-info">
+          <span id="selection-counter-4k">0 items selected</span>
+      </div>
+      <div class="bulk-buttons">
+          <button type="button" class="btn btn-primary" id="subscribe-selected-btn-4k">🎬 Subscribe Selected</button>
+          <button type="button" class="btn btn-danger" id="unsubscribe-selected-btn-4k">🗑️ Unsubscribe Selected</button>
+          <button type="button" class="btn btn-secondary" id="select-all-btn-4k">☑️ Select All</button>
+          <button type="button" class="btn btn-secondary" id="clear-selection-btn-4k">🗑️ Clear</button>
+          <button type="button" class="btn btn-outline" id="exit-bulk-btn-4k">❌ Exit Bulk Mode</button>
+      </div>
+  </div>
+  
   <form style="display:none">{% csrf_token %}</form>
   {% if items %}
   <div class="grid-cards">
     {% for it in items %}
   <div class="card{% if it.is_subscribed_4k %} subscribed{% endif %}" data-tmdb="{{ it.tmdbId }}" data-title="{{ it.title|escape }}" data-poster="{{ it.poster|default:'' }}" data-overview="{{ it.overview|default:''|escape }}" data-subscribed="{{ it.is_subscribed_4k|yesno:'1,0' }}">
+      <div class="bulk-checkbox-4k" style="display: none;">
+          <input type="checkbox" data-type="movie4k" data-id="{{ it.tmdbId }}" data-title="{{ it.title|escape }}"
+                 onclick="event.stopPropagation(); toggleBulkSelection4k(this);">
+      </div>
       {% if it.poster %}
       <img src="{{ it.poster }}" alt="{{ it.title }} poster">
       {% else %}
@@ -147,6 +301,10 @@
   backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
   window.addEventListener('keydown', e=>{ if(e.key === 'Escape') closeModal(); });
 
+  // ===== Bulk Edit Variables =====
+  let bulkEditMode4k = false;
+  let selectedItems4k = new Set();
+
   let lastCard = null;
   function applySubUI(card, on){
     if(card){ card.classList.toggle('subscribed', !!on); }
@@ -158,7 +316,14 @@
 
   document.querySelectorAll('.grid-cards .card').forEach(card => {
     card.addEventListener('click', (e) => {
-  if (e.target && (e.target.classList.contains('btn') || e.target.closest('.actions'))) return;
+      // Don't open modal in bulk edit mode
+      if (bulkEditMode4k) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+      }
+      
+      if (e.target && (e.target.classList.contains('btn') || e.target.closest('.actions'))) return;
       lastCard = card;
       const title = card.dataset.title || '';
       const poster = card.dataset.poster || '';
@@ -209,6 +374,236 @@
       }
     });
   }
+
+  // ===== Bulk Edit Functionality for 4K =====
+  // (Variables already defined above)
+
+  // Toggle function for bulk selection
+  function toggleBulkSelection4k(checkbox) {
+      const itemKey = checkbox.dataset.type + '-' + checkbox.dataset.id;
+      console.log('Toggle 4K called:', itemKey, checkbox.checked);
+      
+      if (checkbox.checked) {
+          selectedItems4k.add(itemKey);
+      const card = checkbox.closest('.card');
+      if (card) card.classList.add('bulk-selected');
+      } else {
+          selectedItems4k.delete(itemKey);
+      const card = checkbox.closest('.card');
+      if (card) card.classList.remove('bulk-selected');
+      }
+      
+      console.log('Selected 4K items:', selectedItems4k);
+      updateSelectionCounter4k();
+  }
+  window.toggleBulkSelection4k = toggleBulkSelection4k;
+
+  // Initialize bulk edit functionality
+  function initBulkEdit4k() {
+          const bulkEditBtn = document.getElementById('bulk-edit-btn-4k');
+          const exitBulkBtn = document.getElementById('exit-bulk-btn-4k');
+          const selectAllBtn = document.getElementById('select-all-btn-4k');
+          const clearSelectionBtn = document.getElementById('clear-selection-btn-4k');
+          const subscribeSelectedBtn = document.getElementById('subscribe-selected-btn-4k');
+          const unsubscribeSelectedBtn = document.getElementById('unsubscribe-selected-btn-4k');
+          const bulkActions = document.getElementById('bulk-actions-4k');
+          const bulkCheckboxes = document.querySelectorAll('.bulk-checkbox-4k');
+          const selectionCounter = document.getElementById('selection-counter-4k');      if (!bulkEditBtn) return; // Exit if elements don't exist
+
+          bulkEditBtn.addEventListener('click', function() {
+              bulkEditMode4k = true;
+              bulkActions.style.display = 'flex';
+              this.style.display = 'none';
+              bulkCheckboxes.forEach(cb => cb.style.display = 'block');
+              updateSelectionCounter4k();
+          });      exitBulkBtn.addEventListener('click', function() {
+          exitBulkEditMode4k();
+      });
+
+      selectAllBtn.addEventListener('click', function() {
+          const checkboxes = document.querySelectorAll('.bulk-checkbox-4k input[type="checkbox"]');
+          checkboxes.forEach(cb => {
+              cb.checked = true;
+              selectedItems4k.add(cb.dataset.type + '-' + cb.dataset.id);
+          });
+          updateSelectionCounter4k();
+      });
+
+      clearSelectionBtn.addEventListener('click', function() {
+          const checkboxes = document.querySelectorAll('.bulk-checkbox-4k input[type="checkbox"]');
+          checkboxes.forEach(cb => cb.checked = false);
+          selectedItems4k.clear();
+          updateSelectionCounter4k();
+      });
+
+          subscribeSelectedBtn.addEventListener('click', function() {
+              if (selectedItems4k.size === 0) {
+                  alert('Please select at least one item to subscribe.');
+                  return;
+              }
+              
+              const selectedData = [];
+              selectedItems4k.forEach(itemKey => {
+                  const [type, id] = itemKey.split('-');
+                  const checkbox = document.querySelector(`input[data-type="${type}"][data-id="${id}"]`);
+                  if (checkbox) {
+                      selectedData.push({
+                          type: type,
+                          id: id,
+                          title: checkbox.dataset.title
+                      });
+                  }
+              });
+
+              bulkOperation4k(selectedData, 'subscribe');
+          });
+
+          unsubscribeSelectedBtn.addEventListener('click', function() {
+              if (selectedItems4k.size === 0) {
+                  alert('Please select at least one item to unsubscribe.');
+                  return;
+              }
+              
+              const selectedData = [];
+              selectedItems4k.forEach(itemKey => {
+                  const [type, id] = itemKey.split('-');
+                  const checkbox = document.querySelector(`input[data-type="${type}"][data-id="${id}"]`);
+                  if (checkbox) {
+                      selectedData.push({
+                          type: type,
+                          id: id,
+                          title: checkbox.dataset.title
+                      });
+                  }
+              });
+
+              bulkOperation4k(selectedData, 'unsubscribe');
+          });
+      }
+
+      function exitBulkEditMode4k() {
+          bulkEditMode4k = false;
+          selectedItems4k.clear();
+          document.getElementById('bulk-actions-4k').style.display = 'none';
+          document.getElementById('bulk-edit-btn-4k').style.display = 'inline-block';
+          document.querySelectorAll('.bulk-checkbox-4k').forEach(cb => {
+              cb.style.display = 'none';
+              cb.querySelector('input').checked = false;
+          });
+          document.querySelectorAll('.bulk-selected').forEach(el => el.classList.remove('bulk-selected'));
+      }
+
+      function updateSelectionCounter4k() {
+          const counter = document.getElementById('selection-counter-4k');
+          const count = selectedItems4k.size;
+          console.log('Update 4K counter called:', count, counter);
+          
+          if (counter) {
+              counter.textContent = count === 1 ? '1 item selected' : `${count} items selected`;
+          } else {
+              console.error('4K Selection counter element not found!');
+          }
+      }
+
+      function bulkOperation4k(items, operation) {
+          if (items.length === 0) return;
+
+          const actionText = operation === 'subscribe' ? 'subscribed to' : 'unsubscribed from';
+          // attach card reference for direct UI updates
+          items.forEach(it => {
+              it.card = document.querySelector(`.card[data-tmdb='${CSS.escape(it.id)}']`);
+          });
+          const promises = items.map(item => (
+              operation === 'subscribe'
+                  ? subscribeToMovie4k(item.id, item.title)
+                  : unsubscribeFromMovie4k(item.id, item.title)
+          ));
+          Promise.all(promises).then(results => {
+              results.forEach((res, idx) => {
+                  const item = items[idx];
+                  if (!item.card) return;
+                  if (res.success) {
+                      if (operation === 'subscribe') {
+                          item.card.dataset.subscribed = '1';
+                          item.card.classList.add('subscribed');
+                      } else {
+                          item.card.dataset.subscribed = '0';
+                          item.card.classList.remove('subscribed');
+                      }
+                  }
+              });
+              const successful = results.filter(r => r.success).length;
+              const failed = results.length - successful;
+              if (failed === 0) {
+                  showNotification4k(`Successfully ${actionText} ${successful} 4K items!`, 'success');
+              } else {
+                  showNotification4k(`${successful} successful, ${failed} failed operations.`, 'warning');
+              }
+              exitBulkEditMode4k();
+          });
+      }
+
+      async function safePost4k(url){
+          try {
+              const csrftoken = document.querySelector('input[name=csrfmiddlewaretoken]')?.value || (document.cookie.match(/csrftoken=([^;]+)/)||[])[1];
+              const resp = await fetch(url, {method:'POST', headers:{'X-CSRFToken': csrftoken}});
+              return { success: resp.ok };
+          } catch(e){ return { success:false, error:e }; }
+      }
+      function subscribeToMovie4k(movieId, title){
+          return safePost4k(`/api/movies4k/subscribe/${movieId}/`).then(r => ({ success: r.success, title }));
+      }
+      function unsubscribeFromMovie4k(movieId, title){
+          return safePost4k(`/api/movies4k/unsubscribe/${movieId}/`).then(r => ({ success: r.success, title }));
+      }
+      function showNotification4k(message, type = 'info') {
+      // Create notification element
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          padding: 15px 20px;
+          border-radius: 5px;
+          color: white;
+          font-weight: bold;
+          z-index: 1000;
+          max-width: 400px;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      `;
+      
+      // Set background color based on type
+      switch(type) {
+          case 'success':
+              notification.style.backgroundColor = '#28a745';
+              break;
+          case 'warning':
+              notification.style.backgroundColor = '#ffc107';
+              notification.style.color = '#212529';
+              break;
+          case 'error':
+              notification.style.backgroundColor = '#dc3545';
+              break;
+          default:
+              notification.style.backgroundColor = '#17a2b8';
+      }
+      
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      
+      // Remove notification after 3 seconds
+      setTimeout(() => {
+          if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+          }
+      }, 3000);
+  }
+
+  // Initialize bulk edit functionality when DOM is loaded
+  document.addEventListener('DOMContentLoaded', function() {
+      initBulkEdit4k();
+  });
 })();
 </script>
 {% endblock %}

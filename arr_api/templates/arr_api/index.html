@@ -37,7 +37,22 @@
         </nav>
 
         <div class="controls-actions">
+            <button type="button" id="bulk-edit-btn">📋 Bulk Edit</button>
             <a href="/calendar/" class="btn btn-accent" title="Open calendar">📅 Calendar</a>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Bar (hidden by default) -->
+    <div id="bulk-actions">
+        <div class="bulk-info">
+            <span id="selection-counter">0 items selected</span>
+        </div>
+        <div class="bulk-buttons">
+            <button type="button" class="btn btn-primary" id="subscribe-selected-btn">📺 Subscribe Selected</button>
+            <button type="button" class="btn btn-danger" id="unsubscribe-selected-btn">🗑️ Unsubscribe Selected</button>
+            <button type="button" class="btn btn-secondary" id="select-all-btn">☑️ Select All</button>
+            <button type="button" class="btn btn-secondary" id="clear-selection-btn">🗑️ Clear</button>
+            <button type="button" class="btn btn-outline" id="exit-bulk-btn">❌ Exit Bulk Mode</button>
         </div>
     </div>
 
@@ -48,6 +63,10 @@
             {% for s in series_grouped %}
             <div class="card" data-series-id="{{ s.seriesId }}" data-title="{{ s.seriesTitle|escape }}"
                 data-poster="{{ s.seriesPoster|default:'' }}" data-overview="{{ s.seriesOverview|default:''|escape }}">
+                <div class="bulk-checkbox" style="display: none;">
+                    <input type="checkbox" data-type="series" data-id="{{ s.seriesId }}" data-title="{{ s.seriesTitle|escape }}" 
+                           onclick="event.stopPropagation(); toggleBulkSelection(this);">
+                </div>
                 <div class="poster">
                     {% if s.seriesPoster %}
                     <img src="{{ s.seriesPoster }}" alt="{{ s.seriesTitle }}">
@@ -87,8 +106,12 @@
     <h2>Upcoming movies</h2>
         <div class="grid">
             {% for m in movies %}
-            <div class="movie-card" data-kind="movie" data-title="{{ m.title|escape }}"
-                data-poster="{{ m.posterUrl|default:'' }}" data-overview="{{ m.overview|default:''|escape }}">
+            <div class="card" data-movie-id="{{ m.tmdbId }}" data-title="{{ m.title|escape }}"
+                data-poster="{{ m.poster|default:'' }}" data-overview="{{ m.overview|default:''|escape }}">
+                <div class="bulk-checkbox" style="display: none;">
+                    <input type="checkbox" data-type="movie" data-id="{{ m.tmdbId }}" data-title="{{ m.title|escape }}"
+                           onclick="event.stopPropagation(); toggleBulkSelection(this);">
+                </div>
                 {% if m.posterUrl %}
                 <img src="{{ m.posterUrl }}" alt="{{ m.title }}">
                 {% else %}
@@ -145,6 +168,10 @@
         // ===== Helpers =====
         const $ = (sel, root = document) => root.querySelector(sel);
         const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+        // ===== Bulk Edit Variables =====
+        let bulkEditMode = false;
+        let selectedItems = new Set();
 
         // ===== Modal-Elemente =====
         const backdrop = $("#modalBackdrop");
@@ -302,7 +329,14 @@
 
     // ===== Open series cards =====
         $$(".card").forEach(card => {
-            card.addEventListener("click", () => {
+            card.addEventListener("click", (e) => {
+                // Don't open modal in bulk edit mode
+                if (bulkEditMode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                
                 lastClickedCard = card;
 
                 const id = card.dataset.seriesId;
@@ -369,7 +403,14 @@
 
     // ===== Open movie cards =====
         $$(".movie-card").forEach(card => {
-            card.addEventListener("click", () => {
+            card.addEventListener("click", (e) => {
+                // Don't open modal in bulk edit mode
+                if (bulkEditMode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+                
                 lastClickedCard = card;
 
                 const title = card.dataset.title || "";
@@ -426,6 +467,300 @@
             const d = new Date(v);
             el.textContent = isNaN(d) ? v : d.toLocaleString();
         });
+
+        // ===== Bulk Edit Functionality =====
+        // (Variables already defined above)
+
+        // Toggle function for bulk selection
+        function toggleBulkSelection(checkbox) {
+            const itemKey = checkbox.dataset.type + '-' + checkbox.dataset.id;
+            console.log('Toggle called:', itemKey, checkbox.checked);
+            
+            if (checkbox.checked) {
+                selectedItems.add(itemKey);
+        const card = checkbox.closest('.card, .movie-card');
+        if (card) card.classList.add('bulk-selected');
+            } else {
+                selectedItems.delete(itemKey);
+        const card = checkbox.closest('.card, .movie-card');
+        if (card) card.classList.remove('bulk-selected');
+            }
+            
+            console.log('Selected items:', selectedItems);
+            updateSelectionCounter();
+        }
+    // Make available for inline onclick handlers
+    window.toggleBulkSelection = toggleBulkSelection;
+
+        // Initialize bulk edit functionality
+        function initBulkEdit() {
+            const bulkEditBtn = document.getElementById('bulk-edit-btn');
+            const exitBulkBtn = document.getElementById('exit-bulk-btn');
+            const selectAllBtn = document.getElementById('select-all-btn');
+            const clearSelectionBtn = document.getElementById('clear-selection-btn');
+            const subscribeSelectedBtn = document.getElementById('subscribe-selected-btn');
+            const unsubscribeSelectedBtn = document.getElementById('unsubscribe-selected-btn');
+            const bulkActions = document.getElementById('bulk-actions');
+            const bulkCheckboxes = document.querySelectorAll('.bulk-checkbox');
+            const selectionCounter = document.getElementById('selection-counter');
+
+            bulkEditBtn.addEventListener('click', function() {
+                bulkEditMode = true;
+                bulkActions.style.display = 'flex';
+                this.style.display = 'none';
+                bulkCheckboxes.forEach(cb => cb.style.display = 'block');
+                updateSelectionCounter();
+            });
+
+            exitBulkBtn.addEventListener('click', function() {
+                exitBulkEditMode();
+            });
+
+            selectAllBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('.bulk-checkbox input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    selectedItems.add(cb.dataset.type + '-' + cb.dataset.id);
+                });
+                updateSelectionCounter();
+            });
+
+            clearSelectionBtn.addEventListener('click', function() {
+                const checkboxes = document.querySelectorAll('.bulk-checkbox input[type="checkbox"]');
+                checkboxes.forEach(cb => cb.checked = false);
+                selectedItems.clear();
+                updateSelectionCounter();
+            });
+
+            subscribeSelectedBtn.addEventListener('click', function() {
+                if (selectedItems.size === 0) {
+                    alert('Please select at least one item to subscribe.');
+                    return;
+                }
+                
+                const selectedData = [];
+                selectedItems.forEach(itemKey => {
+                    const [type, id] = itemKey.split('-');
+                    const checkbox = document.querySelector(`input[data-type="${type}"][data-id="${id}"]`);
+                    if (checkbox) {
+                        selectedData.push({
+                            type: type,
+                            id: id,
+                            title: checkbox.dataset.title
+                        });
+                    }
+                });
+
+                bulkOperation(selectedData, 'subscribe');
+            });
+
+            unsubscribeSelectedBtn.addEventListener('click', function() {
+                if (selectedItems.size === 0) {
+                    alert('Please select at least one item to unsubscribe.');
+                    return;
+                }
+                
+                const selectedData = [];
+                selectedItems.forEach(itemKey => {
+                    const [type, id] = itemKey.split('-');
+                    const checkbox = document.querySelector(`input[data-type="${type}"][data-id="${id}"]`);
+                    if (checkbox) {
+                        selectedData.push({
+                            type: type,
+                            id: id,
+                            title: checkbox.dataset.title
+                        });
+                    }
+                });
+
+                bulkOperation(selectedData, 'unsubscribe');
+            });
+        }
+
+        function exitBulkEditMode() {
+            bulkEditMode = false;
+            selectedItems.clear();
+            document.getElementById('bulk-actions').style.display = 'none';
+            document.getElementById('bulk-edit-btn').style.display = 'inline-block';
+            document.querySelectorAll('.bulk-checkbox').forEach(cb => {
+                cb.style.display = 'none';
+                cb.querySelector('input').checked = false;
+            });
+            document.querySelectorAll('.bulk-selected').forEach(el => el.classList.remove('bulk-selected'));
+        }
+
+        function updateSelectionCounter() {
+            const counter = document.getElementById('selection-counter');
+            const count = selectedItems.size;
+            console.log('Update counter called:', count, counter);
+            
+            if (counter) {
+                counter.textContent = count === 1 ? '1 item selected' : `${count} items selected`;
+            } else {
+                console.error('Selection counter element not found!');
+            }
+        }
+
+        function bulkOperation(items, operation) {
+            if (items.length === 0) return;
+
+            const actionText = operation === 'subscribe' ? 'subscribed to' : 'unsubscribed from';
+            // Attach card references to each item for direct UI update
+            items.forEach(it => {
+                if (it.type === 'series') {
+                    it.card = document.querySelector(`.card[data-series-id='${CSS.escape(it.id)}']`);
+                } else if (it.type === 'movie') {
+                    it.card = Array.from(document.querySelectorAll(`.card[data-movie-id]`))
+                        .find(c => c.dataset.movieId === it.id);
+                }
+            });
+
+            const promises = items.map(item => {
+                if (item.type === 'series') {
+                    return operation === 'subscribe'
+                        ? subscribeToSeries(item.id, item.title)
+                        : unsubscribeFromSeries(item.id, item.title);
+                } else if (item.type === 'movie') {
+                    return operation === 'subscribe'
+                        ? subscribeToMovie(item.id, item.title)
+                        : unsubscribeFromMovie(item.id, item.title);
+                }
+                return Promise.resolve({ success: false, title: item.title });
+            });
+
+            Promise.all(promises).then(results => {
+                results.forEach((res, idx) => {
+                    const item = items[idx];
+                    if (!item.card) return;
+                    // Update subCache + UI immediately if success
+                    if (res.success) {
+                        if (item.type === 'series') {
+                            const key = `series:${item.id}`;
+                            if (operation === 'subscribe') subCache.set(key, true); else subCache.delete(key);
+                        } else if (item.type === 'movie') {
+                            const key = `movie:${item.title}`;
+                            if (operation === 'subscribe') subCache.set(key, true); else subCache.delete(key);
+                        }
+                        applySubUI(item.card, operation === 'subscribe');
+                    }
+                });
+
+                const successful = results.filter(r => r.success).length;
+                const failed = results.length - successful;
+
+                if (failed === 0) {
+                    showNotification(`Successfully ${actionText} ${successful} items!`, 'success');
+                } else {
+                    showNotification(`${successful} successful, ${failed} failed operations.`, failed ? 'warning' : 'success');
+                }
+                exitBulkEditMode();
+            });
+        }
+
+        // Safe POST helper that treats any 2xx as success even without JSON
+        async function safePost(url, bodyObj=null) {
+            try {
+                const init = { method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') } };
+                if (bodyObj) {
+                    init.headers['Content-Type'] = 'application/json';
+                    init.body = JSON.stringify(bodyObj);
+                }
+                const resp = await fetch(url, init);
+                if (resp.status === 403) return { success: false, forbidden: true };
+                let data = null;
+                try { data = await resp.clone().json(); } catch(_) {}
+                const success = (data && typeof data.success === 'boolean') ? data.success : resp.ok;
+                return { success, data };
+            } catch (e) {
+                return { success: false, error: e };
+            }
+        }
+
+        function subscribeToSeries(seriesId, title) {
+            return safePost('{% url "arr_api:subscribe-series" 0 %}'.replace('0', seriesId), {
+                series_id: seriesId,
+                series_title: title
+            }).then(r => ({ success: r.success, title }));
+        }
+
+        function subscribeToMovie(movieId, title) {
+            return safePost('{% url "arr_api:subscribe-movie" "placeholder" %}'.replace('placeholder', encodeURIComponent(title)), {
+                movie_id: movieId,
+                movie_title: title
+            }).then(r => ({ success: r.success, title }));
+        }
+
+        function unsubscribeFromSeries(seriesId, title) {
+            return safePost('{% url "arr_api:unsubscribe-series" 0 %}'.replace('0', seriesId))
+                .then(r => ({ success: r.success, title }));
+        }
+
+        function unsubscribeFromMovie(movieId, title) {
+            return safePost('{% url "arr_api:unsubscribe-movie" "placeholder" %}'.replace('placeholder', encodeURIComponent(title)))
+                .then(r => ({ success: r.success, title }));
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 5px;
+                color: white;
+                font-weight: bold;
+                z-index: 1000;
+                max-width: 400px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            `;
+            
+            // Set background color based on type
+            switch(type) {
+                case 'success':
+                    notification.style.backgroundColor = '#28a745';
+                    break;
+                case 'warning':
+                    notification.style.backgroundColor = '#ffc107';
+                    notification.style.color = '#212529';
+                    break;
+                case 'error':
+                    notification.style.backgroundColor = '#dc3545';
+                    break;
+                default:
+                    notification.style.backgroundColor = '#17a2b8';
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Initialize bulk edit functionality
+        initBulkEdit();
     })();
 </script>
 {% endblock %}
