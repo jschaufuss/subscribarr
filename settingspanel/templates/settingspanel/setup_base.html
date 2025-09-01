@@ -8,6 +8,13 @@
     <title>{% block title %}Setup – Subscribarr{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     {% block extra_style %}{% endblock %}
+    <style>
+    .notification{position:fixed;top:20px;right:20px;padding:14px 18px;border-radius:8px;font-weight:600;color:#fff;z-index:2000;box-shadow:0 4px 18px rgba(0,0,0,.35);opacity:0;transform:translateY(-6px);animation:ntfIn .25s ease forwards;max-width:380px;font-size:.9rem;display:flex;align-items:center;gap:10px}
+    .notification.info{background:#2563eb}.notification.success{background:#1f6f3a}.notification.warning{background:#d97706}.notification.error{background:#b91c1c}
+    @keyframes ntfIn{to{opacity:1;transform:translateY(0)}}@keyframes ntfOut{to{opacity:0;transform:translateY(-6px)}}
+    .notification button.ntf-close{background:transparent;border:0;color:inherit;font-size:1.1rem;cursor:pointer;margin-left:6px;opacity:.75}
+    .notification button.ntf-close:hover{opacity:1}
+    </style>
 </head>
 
 <body class="setup-page">
@@ -22,6 +29,19 @@
     <div class="content">
         {% block content %}{% endblock %}
     </div>
+    <script>
+    window.notify = function(message, type='info', opts={}){
+        const timeout = opts.timeout || 3200;
+        const n = document.createElement('div');
+        n.className = 'notification '+type;
+        n.innerHTML = `<span style="flex:1">${message}</span><button class="ntf-close" aria-label="Close">&times;</button>`;
+        document.body.appendChild(n);
+        const remove=()=>{ if(!n.parentNode) return; n.style.animation='ntfOut .25s ease forwards'; setTimeout(()=>n.remove(), 240); };
+        n.querySelector('.ntf-close').addEventListener('click', remove);
+        if(timeout>0) setTimeout(remove, timeout);
+        return n;
+    };
+    </script>
 </body>
 
 </html>

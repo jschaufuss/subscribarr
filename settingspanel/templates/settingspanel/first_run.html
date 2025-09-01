@@ -81,10 +81,11 @@ function getCsrfToken() {
 
 function showTestResult(elementId, success, message) {
     const el = document.getElementById(elementId);
-    el.className = 'test-result ' + (success ? 'success' : 'error');
-    el.textContent = message;
-    
-    // Update submit button state if this is Jellyfin test
+    if(el){
+        el.className = 'test-result ' + (success ? 'success' : 'error');
+        el.textContent = message;
+    }
+    notify(message, success ? 'success' : 'error');
     if (elementId === 'jellyfin-test-result') {
         jellyfinTested = success;
         updateSubmitButton();
@@ -113,7 +114,7 @@ function testJellyfin() {
         return;
     }
 
-    showTestResult('jellyfin-test-result', true, 'Testing...');
+    showTestResult('jellyfin-test-result', true, 'Testing Jellyfin...');
     
     fetch(`{% url "settingspanel:test_setup_connection" %}?kind=jellyfin&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
     .then(response => response.json())
@@ -138,7 +139,7 @@ function testSonarr() {
         return;
     }
 
-    showTestResult('sonarr-test-result', true, 'Testing...');
+    showTestResult('sonarr-test-result', true, 'Testing Sonarr...');
     
     fetch(`{% url "settingspanel:test_setup_connection" %}?kind=sonarr&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
     .then(response => response.json())
@@ -163,7 +164,7 @@ function testRadarr() {
         return;
     }
 
-    showTestResult('radarr-test-result', true, 'Testing...');
+    showTestResult('radarr-test-result', true, 'Testing Radarr...');
     
     fetch(`{% url "settingspanel:test_setup_connection" %}?kind=radarr&url=${encodeURIComponent(url)}&key=${encodeURIComponent(apiKey)}`)
     .then(response => response.json())

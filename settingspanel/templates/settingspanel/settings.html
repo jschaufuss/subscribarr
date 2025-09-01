@@ -16,7 +16,7 @@
         <div class="msgs">{% for m in messages %}<div class="msg">{{ m }}</div>{% endfor %}</div>
         {% endif %}
 
-    <form method="post">
+    <form method="post" id="settings-form">
             {% csrf_token %}
             <div class="grid">
                 <div class="card">
@@ -324,16 +324,16 @@
             const url = (row.querySelector('[name$="-base_url"]').value||'').trim();
             const key = (row.querySelector('[name$="-api_key"]').value||'').trim();
             if(!kind || !url || !key){
-                alert('Please fill kind, URL and API key first.');
+                notify('Please fill kind, URL and API key first.','warning');
                 return;
             }
             fetch(`/settings/test-connection/?kind=${encodeURIComponent(kind)}&url=${encodeURIComponent(url)}&key=${encodeURIComponent(key)}`)
                 .then(r=>r.json())
                 .then(data=>{
-                    if(data.ok) alert(kind + ' connection successful!');
-                    else alert(kind + ' error: ' + (data.error || 'Unknown error') + '\nCheck base URL (http(s)://host:port) and API key.');
+                    if(data.ok) notify(kind + ' connection successful!','success');
+                    else notify(kind + ' error: ' + (data.error || 'Unknown error'),'error');
                 })
-                .catch(err=>alert(kind + ' error: ' + String(err)));
+                .catch(err=>notify(kind + ' error: ' + String(err),'error'));
         }
 
         function testNotify(channel, btn){
@@ -341,10 +341,10 @@
             fetch(`/settings/test-notify/?channel=${encodeURIComponent(channel)}`)
                 .then(r=>r.json())
                 .then(data=>{
-                    if(data.ok) alert(`Test ${channel} sent.`);
-                    else alert(`Test ${channel} failed: ${data.error||'Unknown error'}`);
+                    if(data.ok) notify(`Test ${channel} sent.`,'success');
+                    else notify(`Test ${channel} failed: ${data.error||'Unknown error'}`,'error');
                 })
-                .catch(err=>alert(`Test ${channel} error: ${String(err)}`))
+                .catch(err=>notify(`Test ${channel} error: ${String(err)}`,'error'))
                 .finally(()=>{ if(btn) btn.disabled=false; });
         }
 
@@ -353,11 +353,47 @@
             fetch(`/settings/reset-notify-tokens/?scope=${encodeURIComponent(scope)}`)
                 .then(r=>r.json())
                 .then(data=>{
-                    if(data.ok) alert(`Cleared ${data.deleted||0} token(s).`);
-                    else alert(`Reset failed: ${data.error||'Unknown error'}`);
+                    if(data.ok) notify(`Cleared ${data.deleted||0} token(s).`,'success');
+                    else notify(`Reset failed: ${data.error||'Unknown error'}`,'error');
                 })
-                .catch(err=>alert(`Reset error: ${String(err)}`))
+                .catch(err=>notify(`Reset error: ${String(err)}`,'error'))
                 .finally(()=>{ if(btn) btn.disabled=false; });
         }
+    // Intercept form submit to show toast when server responds with same page (status 200)
+    (function(){
+        const form = document.getElementById('settings-form');
+        if(!form) return;
+        form.addEventListener('submit', function(ev){
+            // Allow normal submit if no fetch support
+            if(!window.fetch) return;
+            ev.preventDefault();
+            const fd = new FormData(form);
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const prevTxt = submitBtn ? submitBtn.textContent : '';
+            if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+            fetch(form.action || window.location.href, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With':'fetch' }
+            }).then(r=> r.text().then(html => ({ ok: r.ok, html })))
+            .then(res => {
+                if(!res.ok){ notify('Save failed (HTTP '+ (res.status||'error') +')','error'); return; }
+                // Replace only the form area to reflect validation errors or new state
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(res.html, 'text/html');
+                const newForm = doc.querySelector('#settings-form');
+                if(newForm){
+                    form.replaceWith(newForm);
+                    notify('Settings saved','success');
+                } else {
+                    // Fallback full reload if structure changed
+                    notify('Settings saved','success');
+                    window.location.reload();
+                }
+            })
+            .catch(err => { console.error(err); notify('Save error: '+ err,'error'); })
+            .finally(()=>{ if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent = prevTxt; }});
+        });
+    })();
     </script>
 {% endblock %}
