@@ -343,35 +343,43 @@ def check_and_notify_users():
 
     # Series subscriptions: iterate over all to detect new available episodes
     for sub in SeriesSubscription.objects.select_related('user').all():
-    # Fetch all episodes for this series from Sonarr
-        episodes_to_check = []
-        
-    # 1. Check calendar episodes (early notifications)
+        # NOTE: This loop handles two scenarios:
+        #  - Early notifications (calendar) before a file exists (lookahead window)
+        #  - Late downloads: file appears hours/days after original air date; we still notify
+        # De-duplication is enforced via SentNotification (per episodeId + date) and added_ids set.
+        # Collect episodes to evaluate for this subscription
+        episodes_to_check: list[dict] = []
+        added_ids = set()
+
+        # 1. Calendar episodes (early notifications, may not have files yet)
         if sub.series_id in series_idx:
-            episodes_to_check.extend(series_idx[sub.series_id])
-        
-        # 2. Prüfe ALLE verfügbaren Episoden der Serie (für verspätete Downloads)
+            for ep in series_idx[sub.series_id]:
+                eid = ep.get('episodeId') or (ep.get('id'))
+                if eid and eid not in added_ids:
+                    episodes_to_check.append(ep)
+                    added_ids.add(eid)
+
+        # 2. Scan ALL enabled Sonarr instances for episodes that now have a file (late downloads)
         try:
             for inst in _enabled_instances('sonarr'):
-                all_episodes = _sonarr_get(inst.base_url, inst.api_key, "/api/v3/episode", params={"seriesId": sub.series_id}) or []
-                for ep in all_episodes:
-                    # Nur Episoden die eine Datei haben und nach dem Subscription-Datum sind
-                    if not ep.get("hasFile"):
+                all_eps = _sonarr_get(inst.base_url, inst.api_key, "/api/v3/episode", params={"seriesId": sub.series_id}) or []
+                for ep in all_eps:
+                    if not ep.get('hasFile'):
+                        continue  # only interested in available files here
+                    eid = ep.get('episodeId') or ep.get('id')
+                    if not eid or eid in added_ids:
                         continue
-                    
-                    # Prüfe ob Episode nach Subscription-Datum ist
+                    # Skip if episode aired before subscription creation
                     try:
-                        air_date = isoparse(ep.get("airDateUtc")).date() if ep.get("airDateUtc") else None
+                        air_date = isoparse(ep.get('airDateUtc')).date() if ep.get('airDateUtc') else None
                         if air_date and getattr(sub, 'created_at', None) and sub.created_at.date() > air_date:
                             continue
                     except Exception:
                         pass
-                    
-                    # Füge Episode zur Prüfliste hinzu (mit hasFile=True Indikator)
                     ep_copy = dict(ep)
                     ep_copy['seriesId'] = sub.series_id
                     episodes_to_check.append(ep_copy)
-                break  # Nur erste verfügbare Instanz verwenden
+                    added_ids.add(eid)
         except Exception:
             pass
 
@@ -394,7 +402,7 @@ def check_and_notify_users():
                 ctx = {
                     'username': sub.user.username,
                     'title': sub.series_title,
-                    'type': 'Serie',
+                    'type': 'Series',
                     'overview': sub.series_overview,
                     'poster_url': ep.get('seriesPoster'),
                     'episode_title': ep.get('title'),
