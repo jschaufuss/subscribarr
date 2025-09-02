@@ -341,6 +341,33 @@ def check_and_notify_users():
 
     today = timezone.now().date()
 
+    # Cache for series metadata (poster etc.) to avoid multiple API hits
+    series_meta_cache: dict[int, dict] = {}
+    def get_series_meta(sid: int) -> dict | None:
+        if not sid:
+            return None
+        if sid in series_meta_cache:
+            return series_meta_cache[sid]
+        for inst in _enabled_instances('sonarr'):
+            data = _sonarr_get(inst.base_url, inst.api_key, f"/api/v3/series/{sid}") or {}
+            if data.get('id') == sid:
+                # extract poster
+                poster = None
+                for img in (data.get("images") or []):
+                    if (img.get("coverType") or '').lower() == 'poster':
+                        poster = img.get('remoteUrl') or _abs_url(inst.base_url, img.get('url'))
+                        if poster:
+                            break
+                meta = {
+                    'title': data.get('title'),
+                    'poster': poster,
+                    'overview': data.get('overview') or '',
+                }
+                series_meta_cache[sid] = meta
+                return meta
+        series_meta_cache[sid] = {}
+        return None
+
     # Series subscriptions: iterate over all to detect new available episodes
     for sub in SeriesSubscription.objects.select_related('user').all():
         # NOTE: This loop handles two scenarios:
@@ -382,6 +409,10 @@ def check_and_notify_users():
                         pass
                     ep_copy = dict(ep)
                     ep_copy['seriesId'] = sub.series_id
+                    if not ep_copy.get('seriesPoster'):
+                        meta = get_series_meta(sub.series_id)
+                        if meta and meta.get('poster'):
+                            ep_copy['seriesPoster'] = meta.get('poster')
                     episodes_to_check.append(ep_copy)
                     added_ids.add(eid)
                 if logger.isEnabledFor(logging.DEBUG):
@@ -407,12 +438,16 @@ def check_and_notify_users():
             # Prefer HTML email rendering if channel falls back to email
             html = None
             try:
+                poster = ep.get('seriesPoster')
+                if not poster:
+                    meta = series_meta_cache.get(sub.series_id) or get_series_meta(sub.series_id)
+                    poster = (meta or {}).get('poster')
                 ctx = {
                     'username': sub.user.username,
                     'title': sub.series_title,
                     'type': 'Series',
                     'overview': sub.series_overview,
-                    'poster_url': ep.get('seriesPoster'),
+                    'poster_url': poster,
                     'episode_title': ep.get('title'),
                     'season': season,
                     'episode': number,
