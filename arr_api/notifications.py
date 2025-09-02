@@ -358,11 +358,15 @@ def check_and_notify_users():
                 if eid and eid not in added_ids:
                     episodes_to_check.append(ep)
                     added_ids.add(eid)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Early episodes collected user=%s series=%s count=%d", sub.user_id, sub.series_id, len(episodes_to_check))
 
         # 2. Scan ALL enabled Sonarr instances for episodes that now have a file (late downloads)
         try:
             for inst in _enabled_instances('sonarr'):
                 all_eps = _sonarr_get(inst.base_url, inst.api_key, "/api/v3/episode", params={"seriesId": sub.series_id}) or []
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Scanning instance=%s series=%s total_eps=%d", inst.id, sub.series_id, len(all_eps))
                 for ep in all_eps:
                     if not ep.get('hasFile'):
                         continue  # only interested in available files here
@@ -380,6 +384,8 @@ def check_and_notify_users():
                     ep_copy['seriesId'] = sub.series_id
                     episodes_to_check.append(ep_copy)
                     added_ids.add(eid)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Added hasFile episodes user=%s series=%s added_now=%d total=%d", sub.user_id, sub.series_id, len(episodes_to_check), len(added_ids))
         except Exception:
             pass
 
@@ -389,6 +395,8 @@ def check_and_notify_users():
             number = ep.get("episodeNumber")
             if season is None or number is None:
                 continue
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("Evaluate episode user=%s series=%s S%02dE%02d hasFile=%s", sub.user_id, sub.series_id, season, number, ep.get('hasFile'))
                 
             # Nur benachrichtigen wenn Episode verfügbar ist
             if not ep.get("hasFile") and not sonarr_episode_has_file(sub.series_id, season, number):
@@ -415,7 +423,8 @@ def check_and_notify_users():
                 pass
             
             # Reserve duplicate token per episode atomically, then dispatch; rollback on failure
-            episode_id = ep.get('episodeId') or 0
+            # Sonarr calendar provides 'episodeId', episodes endpoint uses 'id'
+            episode_id = ep.get('episodeId') or ep.get('id') or 0
             if not episode_id:
                 continue
             
@@ -435,8 +444,12 @@ def check_and_notify_users():
                         defaults={'media_title': sub.series_title}
                     )
                 if not created:
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug("Series notif skipped duplicate token user=%s series=%s ep=%s", sub.user_id, sub.series_id, episode_id)
                     continue
-            except Exception:
+            except Exception as e:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Series notif token error user=%s series=%s ep=%s err=%s", sub.user_id, sub.series_id, episode_id, e)
                 continue
             ok = _dispatch_user_notification(sub.user, subject=subj, body_text=body, html_message=html)
             if not ok:
@@ -451,6 +464,8 @@ def check_and_notify_users():
                 except Exception:
                     pass
             else:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("Series notif sent user=%s series=%s ep=%s subj=%s", sub.user_id, sub.series_id, episode_id, subj)
                 # Auto-unsubscribe if series ended (no more releases expected)
                 try:
                     for inst in _enabled_instances('sonarr'):
