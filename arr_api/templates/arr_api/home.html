@@ -12,9 +12,9 @@
         {% if recent_notifications %}
           {% for n in recent_notifications %}
             <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:6px;">
-              <div class="title" style="font-weight:600;">{{ n.title }}</div>
-              <div class="muted" style="font-size:.8rem;">{{ n.created_at }}</div>
-              {% if n.body %}<div class="muted" style="font-size:.85rem;">{{ n.body|truncatechars:140 }}</div>{% endif %}
+              <div class="title" style="font-weight:600;">{{ n.media_title }}</div>
+              <div class="muted" style="font-size:.8rem;">{{ n.sent_at }}</div>
+              <div class="muted" style="font-size:.85rem;">Type: {{ n.media_type }}{% if n.air_date %} • Air date: {{ n.air_date }}{% endif %}</div>
             </div>
           {% endfor %}
         {% else %}
