@@ -57,8 +57,31 @@
 		.event-poster { width: 20px; height: 30px; }
 	}
 
-	/* Modal minor polish in this page */
-	.modal { background: #0b1224; border: 1px solid var(--border); }
+	/* Modal consistency - override any specific styling */
+	.modal-backdrop { 
+		background: rgba(10, 12, 20, .85) !important;
+		backdrop-filter: blur(4px) !important;
+	}
+
+	/* FullCalendar popover/more styling - make '+ more' popovers opaque and consistent */
+	.fc-popover, .fc .fc-list-popover, .fc .fc-more-popover, .fc .fc-list {
+		background: var(--card) !important;
+		border: 1px solid var(--border) !important;
+		box-shadow: 0 10px 40px rgba(0,0,0,0.6) !important;
+		backdrop-filter: none !important;
+		color: var(--text) !important;
+		background-color: var(--card) !important;
+		opacity: 1 !important;
+	}
+
+	/* Ensure items inside the popover have readable backgrounds */
+	.fc .fc-list-event, .fc .fc-list-event > * { background: transparent !important; }
+
+	.modal { 
+		background: var(--bg) !important; 
+		border: 1px solid var(--panel-b) !important; 
+		box-shadow: 0 24px 80px rgba(0, 0, 0, .8) !important;
+	}
 	.btn-subscribe { background: var(--primary); color: #06210e; }
 </style>
 <link rel="stylesheet" href="{% static 'css/index.css' %}">
@@ -117,8 +140,17 @@
 	const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
 			const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('subscribarr-sub') : null;
 
-	function openModal(){ backdrop.style.display = 'flex'; backdrop.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
-	function closeModal(){ backdrop.style.display = 'none'; backdrop.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+	function openModal(){ 
+		backdrop.style.display = 'flex'; 
+		backdrop.style.backgroundColor = 'rgba(0, 0, 0, 0.8)'; 
+		backdrop.setAttribute('aria-hidden','false'); 
+		document.body.style.overflow='hidden'; 
+	}
+	function closeModal(){ 
+		backdrop.style.display = 'none'; 
+		backdrop.setAttribute('aria-hidden','true'); 
+		document.body.style.overflow=''; 
+	}
 	closeBtn.addEventListener('click', closeModal);
 	backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
 	window.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
