@@ -173,6 +173,18 @@
                 </div>
 
                 <div class="card">
+                    <h2>Calendar Settings</h2>
+                    <div class="row">
+                        <label>Show Ended Series (Days)</label>
+                        {{ notify_form.show_ended_series_days }}
+                        <div class="help">Show ended series for this many days after they ended. Prevents missing new seasons while hiding old content (default: 2).</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </div>
+
+                <div class="card">
                     <h2>Notifications — Apprise</h2>
                     <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
                     <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>

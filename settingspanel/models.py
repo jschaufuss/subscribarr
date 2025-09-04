@@ -53,6 +53,9 @@ class AppSettings(models.Model):
     # Homepage settings
     recent_activity_days = models.PositiveSmallIntegerField(default=15, help_text="Number of days to look back for recently downloaded movies and series on the homepage.")
     recent_notifications_days = models.PositiveSmallIntegerField(default=7, help_text="Number of days to look back for recent notifications on the homepage.")
+    
+    # Calendar settings
+    show_ended_series_days = models.PositiveSmallIntegerField(default=2, help_text="Show ended series for this many days after they ended (0 = hide immediately).")
 
     updated_at = models.DateTimeField(auto_now=True)
 

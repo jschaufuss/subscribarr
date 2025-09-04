@@ -94,6 +94,10 @@ class NotificationSettingsForm(forms.Form):
         label="Recent Notifications (Days)", required=False, min_value=1, max_value=90, initial=7,
         help_text="Number of days to look back for recent notifications on the homepage."
     )
+    show_ended_series_days = forms.IntegerField(
+        label="Show Ended Series (Days)", required=False, min_value=0, max_value=30, initial=2,
+        help_text="Show ended series for this many days after they ended. 0 = hide immediately."
+    )
 
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)

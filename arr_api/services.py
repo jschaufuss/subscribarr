@@ -74,10 +74,12 @@ def sonarr_calendar(days: int | None = None, base_url: str | None = None, api_ke
                     break
 
         aired = isoparse(ep["airDateUtc"]).isoformat() if ep.get("airDateUtc") else None
-        out.append({
+        series_status = (series.get("status") or "").lower()
+        
+        episode_data = {
             "seriesId": series.get("id"),
             "seriesTitle": series.get("title"),
-            "seriesStatus": (series.get("status") or "").lower(),
+            "seriesStatus": series_status,
             "seriesPoster": poster,
             "seriesOverview": series.get("overview") or "",
             "seriesGenres": series.get("genres") or [],
@@ -89,8 +91,43 @@ def sonarr_calendar(days: int | None = None, base_url: str | None = None, api_ke
             "tvdbId": series.get("tvdbId"),
             "imdbId": series.get("imdbId"),
             "network": series.get("network"),
-        })
-    return [x for x in out if x["seriesStatus"] == "continuing"]
+        }
+        
+        # Apply smart time-based filtering
+        if _should_show_series(series_status, None, ep.get("airDateUtc")):
+            out.append(episode_data)
+    return out
+
+def _should_show_series(series_status: str, series_ended_date: str = None, episode_air_date: str = None):
+    """Determine if a series should be shown based on status and time filters."""
+    from settingspanel.models import AppSettings
+    
+    # Get setting for ended series grace period with fallback for missing column
+    try:
+        settings = AppSettings.current()
+        ended_grace_days = getattr(settings, 'show_ended_series_days', None) or 2
+    except Exception:
+        ended_grace_days = 2
+    
+    # Always show non-ended series
+    if series_status != "ended":
+        return True
+    
+    # For ended series, check grace period
+    if ended_grace_days == 0:
+        return False  # Hide immediately
+    
+    # Check if recently ended (use episode air date as proxy for series end)
+    if episode_air_date:
+        try:
+            air_date = isoparse(episode_air_date).date()
+            cutoff_date = datetime.now().date() - timedelta(days=ended_grace_days)
+            return air_date >= cutoff_date
+        except Exception:
+            pass
+    
+    # If we can't determine date, show it (err on side of inclusion)
+    return True
 
 def radarr_calendar(days: int | None = None, base_url: str | None = None, api_key: str | None = None):
     base = (base_url or ENV_RADARR_URL).strip()
