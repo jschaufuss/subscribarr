@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Home – Subscribarr{% endblock %}
+{% block extra_style %}<link rel="stylesheet" href="{% static 'css/index.css' %}">{% endblock %}
+{% block content %}
+<div class="wrap">
+  <h1>Home</h1>
+  <div class="home-sections">
+    <div class="section">
+      <h2>Recent notifications</h2>
+      <div class="grid" id="recentNotifications">
+        {% if recent_notifications %}
+          {% for n in recent_notifications %}
+            <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:6px;">
+              <div class="title" style="font-weight:600;">{{ n.title }}</div>
+              <div class="muted" style="font-size:.8rem;">{{ n.created_at }}</div>
+              {% if n.body %}<div class="muted" style="font-size:.85rem;">{{ n.body|truncatechars:140 }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="muted">No notifications yet.</p>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Recently added series</h2>
+      <div class="grid" id="recentSeries">
+        {% if recent_series %}
+          {% for s in recent_series %}
+            <div class="card series-card" 
+                 data-series-id="{{ s.seriesId }}" 
+                 data-title="{{ s.seriesTitle|escape }}"
+                 data-poster="{{ s.seriesPoster|default:'' }}"
+                 data-overview="{{ s.seriesOverview|default:'No overview available.'|escape }}"
+                 data-episode-count="{{ s.episodeCount }}"
+                 data-instance-name="{{ s.instanceName }}"
+                 style="cursor:pointer;">
+              <div class="poster">
+                {% if s.seriesPoster %}<img src="{{ s.seriesPoster }}" alt="{{ s.seriesTitle }}">
+                {% else %}<img src="https://via.placeholder.com/110x165?text=No+Poster" alt="">{% endif %}
+              </div>
+              <div class="meta">
+                <div class="title" title="{{ s.seriesTitle }}">{{ s.seriesTitle }}</div>
+                <div class="muted">
+                  {% if s.episodeCount > 1 %}
+                    {{ s.episodeCount }} episodes added
+                  {% else %}
+                    1 episode added
+                  {% endif %}
+                </div>
+                {% if s.instanceName and s.instanceName != 'Default' %}
+                  <div class="muted" style="font-size:.8rem;">{{ s.instanceName }}</div>
+                {% endif %}
+              </div>
+              <!-- Store episode data for modal -->
+              {% for ep in s.episodes %}
+                <input type="hidden" 
+                       class="episode-data" 
+                       data-season="{{ ep.seasonNumber }}" 
+                       data-episode="{{ ep.episodeNumber }}"
+                       data-title="{{ ep.episodeTitle|default:'TBA'|escape }}"
+                       data-overview="{{ ep.episodeOverview|default:'No overview'|escape }}"
+                       data-air-date="{{ ep.airDate|default:'Unknown' }}">
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}<p class="muted">No recent series.</p>{% endif %}
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Recently added movies</h2>
+      <div class="grid" id="recentMovies">
+        {% if recent_movies %}
+          {% for m in recent_movies %}
+            <div class="card movie-card" 
+                 data-movie-id="{{ m.movieId }}" 
+                 data-title="{{ m.title|escape }}"
+                 data-poster="{{ m.poster|default:'' }}"
+                 data-overview="{{ m.overview|default:'No overview available.'|escape }}"
+                 data-year="{{ m.year|default:'' }}"
+                 data-instance-name="{{ m.instanceName }}"
+                 style="cursor:pointer;">
+              {% if m.poster %}<img src="{{ m.poster }}" alt="{{ m.title }}">
+              {% else %}<img src="https://via.placeholder.com/300x450?text=No+Poster" alt="">{% endif %}
+              <div class="title">{{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}</div>
+              {% if m.instanceName and m.instanceName != 'Default' %}
+                <div class="muted" style="font-size:.8rem;">{{ m.instanceName }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}<p class="muted">No recent movies.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for Series Episodes -->
+<div id="seriesModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="m-poster-wrap">
+                <div class="m-poster"><img id="seriesPoster" alt=""></div>
+            </div>
+            <div>
+                <div id="seriesTitle" class="m-title"></div>
+                <div id="seriesSub" class="m-sub"></div>
+            </div>
+            <button class="modal-close" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="section-block">
+                <div class="section-title">Overview</div>
+                <div id="seriesOverview" class="desc muted"></div>
+            </div>
+            <div class="section-block">
+                <div class="section-title">Recent Episodes</div>
+                <div id="episodesList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Movie Details -->
+<div id="movieModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="m-poster-wrap">
+                <div class="m-poster"><img id="moviePoster" alt=""></div>
+            </div>
+            <div>
+                <div id="movieTitle" class="m-title"></div>
+                <div id="movieSub" class="m-sub"></div>
+            </div>
+            <button class="modal-close" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="section-block">
+                <div class="section-title">Overview</div>
+                <div id="movieOverview" class="desc muted"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Modal functionality
+    const seriesModal = document.getElementById('seriesModal');
+    const movieModal = document.getElementById('movieModal');
+    
+    function openModal(modal) {
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeModal(modal) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+    
+    // Close buttons
+    seriesModal.querySelector('.modal-close').addEventListener('click', () => closeModal(seriesModal));
+    movieModal.querySelector('.modal-close').addEventListener('click', () => closeModal(movieModal));
+    
+    // Click outside to close
+    seriesModal.addEventListener('click', (e) => { if(e.target === seriesModal) closeModal(seriesModal); });
+    movieModal.addEventListener('click', (e) => { if(e.target === movieModal) closeModal(movieModal); });
+    
+    // Escape key to close
+    window.addEventListener('keydown', (e) => {
+        if(e.key === 'Escape') {
+            closeModal(seriesModal);
+            closeModal(movieModal);
+        }
+    });
+    
+    // Series card clicks
+    document.querySelectorAll('.series-card').forEach(card => {
+        card.addEventListener('click', () => {
+            // Get data from card attributes
+            const seriesTitle = card.dataset.title;
+            const seriesPoster = card.dataset.poster;
+            const seriesOverview = card.dataset.overview;
+            const episodeCount = card.dataset.episodeCount;
+            const instanceName = card.dataset.instanceName;
+            
+            // Populate modal
+            document.getElementById('seriesTitle').textContent = seriesTitle || '';
+            document.getElementById('seriesSub').textContent = `${episodeCount} episode(s) • ${instanceName}`;
+            document.getElementById('seriesOverview').textContent = seriesOverview || 'No overview available.';
+            document.getElementById('seriesPoster').src = seriesPoster || 'https://via.placeholder.com/130x195?text=No+Poster';
+            
+            // Episodes list
+            const episodesList = document.getElementById('episodesList');
+            episodesList.innerHTML = '';
+            
+            const episodeInputs = card.querySelectorAll('.episode-data');
+            if (episodeInputs.length > 0) {
+                episodeInputs.forEach(input => {
+                    const epDiv = document.createElement('div');
+                    epDiv.style.cssText = 'margin-bottom:8px;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;';
+                    epDiv.innerHTML = `
+                        <div style="font-weight:600;">S${input.dataset.season}E${input.dataset.episode}: ${input.dataset.title}</div>
+                        <div class="muted" style="font-size:0.9rem;">${input.dataset.overview}</div>
+                        <div class="muted" style="font-size:0.8rem;">Air date: ${input.dataset.airDate}</div>
+                    `;
+                    episodesList.appendChild(epDiv);
+                });
+            } else {
+                episodesList.innerHTML = '<div class="muted">No episodes found.</div>';
+            }
+            
+            openModal(seriesModal);
+        });
+    });
+    
+    // Movie card clicks
+    document.querySelectorAll('.movie-card').forEach(card => {
+        card.addEventListener('click', () => {
+            // Get data from card attributes
+            const movieTitle = card.dataset.title;
+            const moviePoster = card.dataset.poster;
+            const movieOverview = card.dataset.overview;
+            const movieYear = card.dataset.year;
+            const instanceName = card.dataset.instanceName;
+            
+            // Populate modal
+            document.getElementById('movieTitle').textContent = movieTitle || '';
+            document.getElementById('movieSub').textContent = `${movieYear || ''} • ${instanceName}`;
+            document.getElementById('movieOverview').textContent = movieOverview || 'No overview available.';
+            document.getElementById('moviePoster').src = moviePoster || 'https://via.placeholder.com/130x195?text=No+Poster';
+            
+            openModal(movieModal);
+        });
+    });
+})();
+</script>
+{% endblock %}

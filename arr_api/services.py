@@ -21,6 +21,7 @@ HAS4K_TTL = int(os.getenv("ARR_HAS4K_TTL", "300"))
 LOOKUP_TTL = int(os.getenv("ARR_LOOKUP_TTL", "300"))
 MOVIE_AVAIL_TTL = int(os.getenv("ARR_MOVIE_AVAIL_TTL", "300"))
 CAL_TTL = int(os.getenv("ARR_CAL_TTL", "120"))
+HISTORY_TTL = int(os.getenv("ARR_HISTORY_TTL", "300"))  # 5 minutes for history
 
 class ArrServiceError(Exception):
     pass
@@ -476,3 +477,341 @@ def tmdb_is_available_any_instance(tmdb_id: int) -> bool:
                 if mid and _movie_is_available_in_instance_cached(inst, mid):
                     return True
     return False
+
+
+def sonarr_recent_history(base_url: str, api_key: str, days: int = None):
+    """Get recent Sonarr history (downloaded episodes) within the specified number of days."""
+    if not base_url or not api_key:
+        return []
+        
+    # Get days from settings if not provided
+    if days is None:
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            days = settings.recent_activity_days or 15
+        except Exception:
+            days = 15
+    
+    # Calculate date range
+    since_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    try:
+        # Get history records with date filter - use smaller page size for faster loading
+        history_data = _get(f"{base_url.rstrip('/')}/api/v3/history", 
+                           {"X-Api-Key": api_key},
+                           params={
+                               "page": 1, 
+                               "pageSize": 50,  # Smaller page size for faster loading
+                               "sortKey": "date", 
+                               "sortDirection": "descending",
+                               "since": since_date
+                           })
+        
+        records = history_data.get('records', []) if isinstance(history_data, dict) else history_data or []
+        episodes = []
+        
+        # Get all series in one API call for better performance
+        series_data = {}
+        try:
+            all_series = _get(f"{base_url.rstrip('/')}/api/v3/series", {"X-Api-Key": api_key})
+            series_data = {s.get('id'): s for s in (all_series or [])}
+        except Exception:
+            pass
+        
+        # Collect unique episode IDs to fetch in batch
+        episode_ids = []
+        for record in records:
+            if record.get('eventType') == 'downloadFolderImported' and record.get('episodeId'):
+                episode_ids.append(record.get('episodeId'))
+        
+        # Get episode details in smaller batches
+        episodes_data = {}
+        batch_size = 10  # Fetch episodes in batches of 10
+        for i in range(0, len(episode_ids), batch_size):
+            batch_ids = episode_ids[i:i+batch_size]
+            for ep_id in batch_ids:
+                try:
+                    episode = _get(f"{base_url.rstrip('/')}/api/v3/episode/{ep_id}", {"X-Api-Key": api_key})
+                    episodes_data[ep_id] = episode
+                except Exception:
+                    episodes_data[ep_id] = {}
+        
+        for record in records:
+            # Only process successful downloads
+            if record.get('eventType') != 'downloadFolderImported':
+                continue
+                
+            episode_id = record.get('episodeId')
+            series_id = record.get('seriesId')
+            
+            if not series_id:
+                continue
+            
+            # Use series data from bulk call
+            series = series_data.get(series_id, {})
+            
+            # Get episode details from batch call
+            episode = episodes_data.get(episode_id, {})
+            
+            # Get poster URL from series
+            poster = None
+            for img in (series.get("images") or []):
+                if (img.get("coverType") or "").lower() == "poster":
+                    poster = img.get("remoteUrl") or _abs_url(base_url, img.get("url"))
+                    if poster:
+                        break
+            
+            episodes.append({
+                'type': 'episode',
+                'seriesId': series.get('id'),
+                'seriesTitle': series.get('title', 'Unknown Series'),
+                'seriesPoster': poster,
+                'seriesOverview': series.get('overview', ''),
+                'seriesGenres': series.get('genres', []),
+                'seriesYear': series.get('year'),
+                'seriesStatus': series.get('status'),
+                'episodeId': episode.get('id', episode_id),
+                'seasonNumber': episode.get('seasonNumber', 0),
+                'episodeNumber': episode.get('episodeNumber', 0),
+                'episodeTitle': episode.get('title', 'TBA'),
+                'episodeOverview': episode.get('overview', ''),
+                'airDate': episode.get('airDate'),
+                'downloadDate': record.get('date'),
+                'quality': record.get('quality', {}).get('quality', {}).get('name', ''),
+                'sourceTitle': record.get('sourceTitle', ''),
+                # instanceName will be set later in get_recent_activity()
+            })
+        
+        return episodes
+    except Exception as e:
+        print(f"Error fetching Sonarr history from {base_url}: {e}")
+        return []
+
+
+def radarr_recent_history(base_url: str, api_key: str, days: int = None):
+    """Get recent Radarr history (downloaded movies) within the specified number of days."""
+    if not base_url or not api_key:
+        return []
+        
+    # Get days from settings if not provided
+    if days is None:
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            days = settings.recent_activity_days or 15
+        except Exception:
+            days = 15
+    
+    # Calculate date range
+    since_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    try:
+        # Get history records with date filter - smaller page size for faster loading
+        history_data = _get(f"{base_url.rstrip('/')}/api/v3/history", 
+                           {"X-Api-Key": api_key},
+                           params={
+                               "page": 1, 
+                               "pageSize": 50,  # Smaller page size for faster loading
+                               "sortKey": "date", 
+                               "sortDirection": "descending",
+                               "since": since_date
+                           })
+        
+        records = history_data.get('records', []) if isinstance(history_data, dict) else history_data or []
+        movies = []
+        
+        # Get all movies in one API call for better performance
+        movies_data = {}
+        try:
+            all_movies = _get(f"{base_url.rstrip('/')}/api/v3/movie", {"X-Api-Key": api_key})
+            movies_data = {m.get('id'): m for m in (all_movies or [])}
+        except Exception:
+            pass
+        
+        for record in records:
+            # Only process successful downloads
+            if record.get('eventType') != 'downloadFolderImported':
+                continue
+                
+            movie_id = record.get('movieId')
+            if not movie_id:
+                continue
+            
+            # Use movie data from bulk call
+            movie = movies_data.get(movie_id, {})
+            
+            # Get poster URL
+            poster = None
+            for img in (movie.get("images") or []):
+                if (img.get("coverType") or "").lower() == "poster":
+                    poster = img.get("remoteUrl") or _abs_url(base_url, img.get("url"))
+                    if poster:
+                        break
+            
+            # Get additional metadata
+            ratings = movie.get('ratings', {})
+            imdb_rating = None
+            tmdb_rating = None
+            
+            if isinstance(ratings, dict):
+                imdb_rating = ratings.get('imdb', {}).get('value') if ratings.get('imdb') else None
+                tmdb_rating = ratings.get('tmdb', {}).get('value') if ratings.get('tmdb') else None
+            
+            movies.append({
+                'type': 'movie',
+                'movieId': movie.get('id'),
+                'title': movie.get('title', 'Unknown Movie'),
+                'poster': poster,
+                'overview': movie.get('overview', ''),
+                'year': movie.get('year'),
+                'tmdbId': movie.get('tmdbId'),
+                'imdbId': movie.get('imdbId'),
+                'genres': movie.get('genres', []),
+                'runtime': movie.get('runtime'),
+                'studio': movie.get('studio'),
+                'certification': movie.get('certification'),
+                'imdbRating': imdb_rating,
+                'tmdbRating': tmdb_rating,
+                'downloadDate': record.get('date'),
+                'quality': record.get('quality', {}).get('quality', {}).get('name', ''),
+                'sourceTitle': record.get('sourceTitle', ''),
+                # instanceName will be set later in get_recent_activity()
+            })
+        
+        return movies
+    except Exception as e:
+        print(f"Error fetching Radarr history from {base_url}: {e}")
+        return []
+
+
+def sonarr_recent_history_cached(inst: ArrInstance, days: int = None):
+    """Cached Sonarr recent history per instance and days."""
+    if not inst or inst.kind != 'sonarr':
+        return []
+    
+    # Get days from settings if not provided
+    if days is None:
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            days = settings.recent_activity_days or 15
+        except Exception:
+            days = 15
+    
+    key = f"arr:history:v1:sonarr:{inst.id}:{int(days)}"
+    data = cache.get(key)
+    if data is not None:
+        return data
+    try:
+        data = sonarr_recent_history(inst.base_url, inst.api_key, days) or []
+    except Exception:
+        data = []
+    cache.set(key, data, HISTORY_TTL)
+    return data
+
+
+def radarr_recent_history_cached(inst: ArrInstance, days: int = None):
+    """Cached Radarr recent history per instance and days."""
+    if not inst or inst.kind != 'radarr':
+        return []
+    
+    # Get days from settings if not provided
+    if days is None:
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            days = settings.recent_activity_days or 15
+        except Exception:
+            days = 15
+    
+    key = f"arr:history:v1:radarr:{inst.id}:{int(days)}"
+    data = cache.get(key)
+    if data is not None:
+        return data
+    try:
+        data = radarr_recent_history(inst.base_url, inst.api_key, days) or []
+    except Exception:
+        data = []
+    cache.set(key, data, HISTORY_TTL)
+    return data
+
+
+def get_recent_activity(days: int = None):
+    """Get combined recent activity from all enabled Sonarr and Radarr instances."""
+    # Get days from settings if not provided
+    if days is None:
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            days = settings.recent_activity_days or 15
+        except Exception:
+            days = 15
+    
+    all_items = []
+    
+    # Get from all enabled instances
+    instances = ArrInstance.objects.filter(enabled=True)
+    
+    for instance in instances:
+        try:
+            if instance.kind == 'sonarr':
+                items = sonarr_recent_history_cached(instance, days)
+                for item in items:
+                    item['instanceName'] = instance.name
+                all_items.extend(items)
+            elif instance.kind == 'radarr':
+                items = radarr_recent_history_cached(instance, days)
+                for item in items:
+                    item['instanceName'] = instance.name
+                all_items.extend(items)
+        except Exception as e:
+            print(f"Error fetching from {instance.name}: {e}")
+            continue
+    
+    # Sort by download date
+    all_items.sort(key=lambda x: x.get('downloadDate', ''), reverse=True)
+    
+    return all_items
+
+
+def group_episodes_by_series(episodes):
+    """Group episodes by series, combining consecutive episodes."""
+    from collections import defaultdict
+    from datetime import datetime
+    
+    series_groups = defaultdict(list)
+    
+    # Group by series
+    for ep in episodes:
+        if ep.get('type') == 'episode':
+            series_id = ep.get('seriesId')
+            if series_id:
+                series_groups[series_id].append(ep)
+    
+    # Sort episodes within each series by season/episode
+    for series_id in series_groups:
+        series_groups[series_id].sort(key=lambda x: (
+            x.get('seasonNumber', 0), 
+            x.get('episodeNumber', 0)
+        ))
+    
+    grouped_series = []
+    for series_id, episodes_list in series_groups.items():
+        if not episodes_list:
+            continue
+            
+        first_ep = episodes_list[0]
+        grouped_series.append({
+            'type': 'series',
+            'seriesId': series_id,
+            'seriesTitle': first_ep.get('seriesTitle'),
+            'seriesPoster': first_ep.get('seriesPoster'),
+            'seriesOverview': first_ep.get('seriesOverview'),
+            'episodes': episodes_list,
+            'episodeCount': len(episodes_list),
+            'downloadDate': max(ep.get('downloadDate', '') for ep in episodes_list),
+            'instanceName': first_ep.get('instanceName')
+        })
+    
+    return grouped_series

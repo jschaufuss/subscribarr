@@ -156,6 +156,23 @@
                 </div>
 
                 <div class="card">
+                    <h2>Homepage Settings</h2>
+                    <div class="row">
+                        <label>Recently Added Items (Days)</label>
+                        {{ notify_form.recent_activity_days }}
+                        <div class="help">Number of days to look back for recently downloaded movies and series on the homepage (default: 15).</div>
+                    </div>
+                    <div class="row">
+                        <label>Recent Notifications (Days)</label>
+                        {{ notify_form.recent_notifications_days }}
+                        <div class="help">Number of days to look back for recent notifications on the homepage (default: 7).</div>
+                    </div>
+                    <div class="card-actions">
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </div>
+
+                <div class="card">
                     <h2>Notifications — Apprise</h2>
                     <div class="row"><label>Default URL(s)</label>{{ notify_form.apprise_default_url }}</div>
                     <div class="help">Users can also set their own ntfy topic or Apprise URLs in their profile.</div>

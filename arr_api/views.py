@@ -14,6 +14,55 @@ from settingspanel.models import AppSettings, ArrInstance
 from .services import sonarr_calendar, radarr_calendar, ArrServiceError, list_movies_missing_4k_across_instances, tmdb_has_4k_any_instance, radarr_lookup_movie_by_tmdb_id, tmdb_is_available_any_instance, sonarr_calendar_cached, radarr_calendar_cached
 from .models import SeriesSubscription, MovieSubscription, Movie4KSubscription
 from django.utils import timezone
+from django.db.models import Q
+
+
+@method_decorator(login_required, name='dispatch')
+class HomeView(View):
+    """Simple dashboard style homepage showing recent user notifications and recently added items from Sonarr/Radarr."""
+    def get(self, request):
+        # Get settings for time ranges
+        from settingspanel.models import AppSettings
+        try:
+            settings = AppSettings.current()
+            notification_days = getattr(settings, 'recent_notifications_days', None) or 7
+        except Exception:
+            notification_days = 7
+        
+        # Recent notifications with time filter
+        recent_notifications = []
+        try:
+            from arr_api.models import SentNotification
+            from datetime import datetime, timedelta
+            
+            since_date = datetime.now() - timedelta(days=notification_days)
+            recent_notifications = list(
+                SentNotification.objects.filter(
+                    user=request.user, 
+                    sent_at__gte=since_date
+                ).order_by('-sent_at')[:20]
+            )
+        except Exception:
+            recent_notifications = []
+
+        # Get recent activity from Sonarr/Radarr history
+        from .services import get_recent_activity, group_episodes_by_series
+        
+        recent_activity = get_recent_activity()
+        
+        # Separate movies and episodes
+        recent_movies = [item for item in recent_activity if item.get('type') == 'movie'][:12]
+        recent_episodes = [item for item in recent_activity if item.get('type') == 'episode']
+        
+        # Group episodes by series
+        recent_series = group_episodes_by_series(recent_episodes)[:12]
+        
+        return render(request, 'arr_api/home.html', {
+            'recent_notifications': recent_notifications,
+            'recent_series': recent_series,
+            'recent_movies': recent_movies,
+            'recent_movies4k': [],  # Keep empty for now, can be added later
+        })
 
 
 def _get_int(request, key, default):

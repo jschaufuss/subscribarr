@@ -102,6 +102,47 @@ class JellyfinClient:
         except:
             return False
 
+    def recent_items(self, token, limit=12, media='series'):
+        """Fetch recently added items from Jellyfin Library.
+        media: 'series' or 'movies'
+        """
+        if not self.server_url:
+            return []
+        if not self.server_url.startswith(('http://','https://')):
+            self.server_url = 'http://' + self.server_url
+        base = self.server_url.rstrip('/')
+        # Jellyfin "Items/Latest" endpoint can filter by IncludeItemTypes
+        item_type = 'Series' if media == 'series' else 'Movie'
+        url = f"{base}/Users/{{user_id}}/Items/Latest?Limit={limit}&IncludeItemTypes={item_type}"
+        headers = {
+            'X-Emby-Authorization': (
+                f'MediaBrowser Client="{self.client}", '
+                f'Device="{self.device}", '
+                f'DeviceId="{self.device_id}", '
+                f'Version="{self.version}", '
+                f'Token="{token}"'
+            )
+        }
+        try:
+            r = requests.get(url.format(user_id='me'), headers=headers, timeout=6)
+            if r.status_code != 200:
+                return []
+            data = r.json() or []
+            items = []
+            for it in data:
+                items.append({
+                    'id': it.get('Id'),
+                    'title': it.get('Name'),
+                    'overview': it.get('Overview') or '',
+                    'year': it.get('ProductionYear'),
+                    'image': f"{base}/Items/{it.get('Id')}/Images/Primary?quality=90&tag={it.get('ImageTags',{}).get('Primary','')}" if it.get('ImageTags',{}).get('Primary') else '',
+                    'type': media,
+                    'premiere_date': it.get('PremiereDate'),
+                })
+            return items
+        except Exception:
+            return []
+
 def jellyfin_admin_required(view_func):
     @wraps(view_func)
     def _wrapped_view(request, *args, **kwargs):

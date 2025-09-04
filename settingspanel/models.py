@@ -50,6 +50,10 @@ class AppSettings(models.Model):
     # Feature flags
     youtube_enabled = models.BooleanField(default=True, help_text="Enable the YouTube subscription feature globally (navigation + routes).")
 
+    # Homepage settings
+    recent_activity_days = models.PositiveSmallIntegerField(default=15, help_text="Number of days to look back for recently downloaded movies and series on the homepage.")
+    recent_notifications_days = models.PositiveSmallIntegerField(default=7, help_text="Number of days to look back for recent notifications on the homepage.")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

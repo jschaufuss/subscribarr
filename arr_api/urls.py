@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    ArrIndexView, SeriesSubscribeView, SeriesUnsubscribeView,
+    HomeView, ArrIndexView, SeriesSubscribeView, SeriesUnsubscribeView,
     MovieSubscribeView, MovieUnsubscribeView,
     ListSeriesSubscriptionsView, ListMovieSubscriptionsView,
     CalendarView, CalendarEventsApi,
@@ -10,7 +10,8 @@ from .views import (
 app_name = 'arr_api'
 
 urlpatterns = [
-    path('', ArrIndexView.as_view(), name='index'),
+    path('', HomeView.as_view(), name='home'),
+    path('releases/', ArrIndexView.as_view(), name='index'),
     # Calendar
     path('calendar/', CalendarView.as_view(), name='calendar'),
     path('api/calendar/events/', CalendarEventsApi.as_view(), name='calendar-events'),

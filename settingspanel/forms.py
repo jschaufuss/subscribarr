@@ -86,6 +86,14 @@ class NotificationSettingsForm(forms.Form):
         help_text="Consider items up to N days in the future for notifications if file is already available."
     )
     youtube_enabled = forms.BooleanField(label="Enable YouTube feature", required=False)
+    recent_activity_days = forms.IntegerField(
+        label="Recently Added Items (Days)", required=False, min_value=1, max_value=90, initial=15,
+        help_text="Number of days to look back for recently downloaded movies and series on the homepage."
+    )
+    recent_notifications_days = forms.IntegerField(
+        label="Recent Notifications (Days)", required=False, min_value=1, max_value=90, initial=7,
+        help_text="Number of days to look back for recent notifications on the homepage."
+    )
 
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)
