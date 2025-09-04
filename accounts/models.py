@@ -34,6 +34,9 @@ class User(AbstractUser):
     # Optional per-user targets/overrides
     ntfy_topic = models.CharField(max_length=200, blank=True, null=True)
     apprise_url = models.TextField(blank=True, null=True)
+
+    # Per-user UI preferences
+    hide_youtube = models.BooleanField(default=False, help_text="Hide YouTube feature in navigation for this user only.")
     
     def check_jellyfin_admin(self):
         """Check if user is Jellyfin admin on the server"""

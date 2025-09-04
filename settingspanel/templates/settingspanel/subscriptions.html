@@ -127,6 +127,7 @@
     </div>
   </div>
 
+  {% if YOUTUBE_GLOBAL_ENABLED %}
   <div class="section">
   <h2>YouTube</h2>
     <div class="grid" id="youtubeGrid">
@@ -150,13 +151,21 @@
       {% endfor %}
     </div>
   </div>
+  {% endif %}
 </div>
 <script>
 (function(){
   const q = document.getElementById('q');
   function filter(){
     const v = (q.value||'').toLowerCase();
-    [document.getElementById('seriesGrid'), document.getElementById('moviesGrid'), document.getElementById('movies4kGrid'), document.getElementById('youtubeGrid')].forEach(grid=>{
+    const grids = [
+      document.getElementById('seriesGrid'),
+      document.getElementById('moviesGrid'),
+      document.getElementById('movies4kGrid')
+    ];
+    const youtubeGridEl = document.getElementById('youtubeGrid');
+    if (youtubeGridEl) grids.push(youtubeGridEl);
+    grids.forEach(grid=>{
       if(!grid) return; Array.from(grid.children).forEach(card=>{
         const text = (card.dataset.user + ' ' + card.dataset.title).toLowerCase();
         card.style.display = text.includes(v) ? '' : 'none';
@@ -184,7 +193,7 @@
         <div class="section-block"><div class="section-title">Series</div><div id="uSeries"></div></div>
         <div class="section-block"><div class="section-title">Movies</div><div id="uMovies"></div></div>
         <div class="section-block"><div class="section-title">4K Movies</div><div id="uMovies4K"></div></div>
-        <div class="section-block"><div class="section-title">YouTube</div><div id="uYoutube"></div></div>
+  {% if YOUTUBE_GLOBAL_ENABLED %}<div class="section-block"><div class="section-title">YouTube</div><div id="uYoutube"></div></div>{% endif %}
       </div>
     </div>`;
   document.body.appendChild(modal);
@@ -255,7 +264,8 @@
         poster: c.querySelector('img')?.src || ''
       };
     });
-    const youtube = Array.from(document.querySelectorAll('#youtubeGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
+    const youtubeGrid = document.getElementById('youtubeGrid');
+    const youtube = youtubeGrid ? Array.from(document.querySelectorAll('#youtubeGrid .card')).filter(c=>c.dataset.user===username).map(c=>{
       const idFromAttr = c.dataset.id || '';
       let idFromText = '';
       if(!idFromAttr){
@@ -267,18 +277,18 @@
         id: idFromAttr || idFromText,
         poster: 'https://via.placeholder.com/50x75?text=YT'
       };
-    });
+    }) : [];
     return {series, movies, movies4k, youtube};
   }
 
   function openForUser(usernameDisplay){
     const username = usernameDisplay.trim().toLowerCase();
-    const {series, movies, movies4k, youtube} = gatherForUser(username);
+  const {series, movies, movies4k, youtube} = gatherForUser(username);
     uTitle.textContent = `Subscriptions for ${usernameDisplay.trim()}`;
     renderList(uSeries, series);
     renderList(uMovies, movies);
     renderList(uMovies4K, movies4k);
-    renderList(uYoutube, youtube);
+  if(uYoutube){ renderList(uYoutube, youtube); }
     open();
   }
 

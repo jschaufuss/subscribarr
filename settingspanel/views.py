@@ -336,6 +336,7 @@ class SettingsView(View):
                 "ntfy_token": cfg.ntfy_token or "",
                 "apprise_default_url": cfg.apprise_default_url or "",
                 "notify_lookahead_days": cfg.notify_lookahead_days or 1,
+                "youtube_enabled": cfg.youtube_enabled,
             }),
         })
 
@@ -385,6 +386,7 @@ class SettingsView(View):
         cfg.ntfy_password      = notify_form.cleaned_data.get("ntfy_password") or None
         cfg.ntfy_token         = notify_form.cleaned_data.get("ntfy_token") or None
         cfg.apprise_default_url = notify_form.cleaned_data.get("apprise_default_url") or None
+        cfg.youtube_enabled = bool(notify_form.cleaned_data.get("youtube_enabled"))
         # Notification behavior
         nad = notify_form.cleaned_data.get("notify_lookahead_days")
         try:

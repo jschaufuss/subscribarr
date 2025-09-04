@@ -1,4 +1,6 @@
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
+from settingspanel.models import AppSettings
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
@@ -7,6 +9,8 @@ from .services import get_youtube_metadata
 
 @login_required
 def index(request):
+    if not AppSettings.current().youtube_enabled:
+        raise Http404()
     subs = YouTubeSubscription.objects.filter(user=request.user).order_by('title')
     items = []
     for s in subs:
@@ -25,6 +29,9 @@ def index(request):
 @login_required
 @require_POST
 def subscribe(request):
+    if not AppSettings.current().youtube_enabled:
+        # Pretend route does not exist when globally disabled
+        raise Http404()
     kind = (request.POST.get('kind') or '').strip()
     target_id = (request.POST.get('target_id') or '').strip()
     title = (request.POST.get('title') or '').strip() or target_id
@@ -39,6 +46,8 @@ def subscribe(request):
 @login_required
 @require_POST
 def unsubscribe(request):
+    if not AppSettings.current().youtube_enabled:
+        raise Http404()
     kind = (request.POST.get('kind') or '').strip()
     target_id = (request.POST.get('target_id') or '').strip()
     YouTubeSubscription.objects.filter(user=request.user, kind=kind, target_id=target_id).delete()

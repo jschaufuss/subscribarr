@@ -143,6 +143,13 @@
                         {{ notify_form.notify_lookahead_days }}
                         <div class="help">Notify early if file is already available up to N days before the official date. Applies to Series and Movies.</div>
                     </div>
+                    <div class="row">
+                        <label>YouTube feature</label>
+                        <label style="display:inline-flex;align-items:center;gap:6px;">
+                            {{ notify_form.youtube_enabled }} <span>Enabled</span>
+                        </label>
+                        <div class="help">Disable to hide YouTube navigation & routes for all users. Users then cannot opt-out individually (their option is hidden).</div>
+                    </div>
                     <div class="card-actions">
                         <button class="btn btn-primary" type="submit">Save</button>
                     </div>
@@ -359,34 +366,40 @@
                 .catch(err=>notify(`Reset error: ${String(err)}`,'error'))
                 .finally(()=>{ if(btn) btn.disabled=false; });
         }
-    // Intercept form submit to show toast when server responds with same page (status 200)
-    (function(){
+    // Intercept form submit for AJAX save and immediate UI toggle update
+    (function initAjaxSettings(){
         const form = document.getElementById('settings-form');
         if(!form) return;
         form.addEventListener('submit', function(ev){
-            // Allow normal submit if no fetch support
-            if(!window.fetch) return;
+            if(!window.fetch) return; // fallback to normal submit
             ev.preventDefault();
             const fd = new FormData(form);
             const submitBtn = form.querySelector('button[type="submit"]');
             const prevTxt = submitBtn ? submitBtn.textContent : '';
             if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
-            fetch(form.action || window.location.href, {
-                method: 'POST',
-                body: fd,
-                headers: { 'X-Requested-With':'fetch' }
-            }).then(r=> r.text().then(html => ({ ok: r.ok, html })))
+            const prevYoutubeEnabled = !!document.querySelector('#id_youtube_enabled:checked');
+            fetch(form.action || window.location.href, { method:'POST', body: fd, headers:{'X-Requested-With':'fetch'} })
+            .then(r=> r.text().then(html => ({ ok: r.ok, html })))
             .then(res => {
                 if(!res.ok){ notify('Save failed (HTTP '+ (res.status||'error') +')','error'); return; }
-                // Replace only the form area to reflect validation errors or new state
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(res.html, 'text/html');
                 const newForm = doc.querySelector('#settings-form');
                 if(newForm){
                     form.replaceWith(newForm);
                     notify('Settings saved','success');
+                    // Re-bind after replacement
+                    initAjaxSettings();
+                    // Detect new youtube state
+                    const newYoutubeEnabled = !!document.querySelector('#id_youtube_enabled:checked');
+                    if(prevYoutubeEnabled && !newYoutubeEnabled){
+                        // Hide nav links immediately
+                        document.querySelectorAll('.nav-youtube, .side-youtube').forEach(el=> el && (el.style.display='none'));
+                    } else if(!prevYoutubeEnabled && newYoutubeEnabled){
+                        // If re-enabled we just reload to show links via template flag
+                        window.location.reload();
+                    }
                 } else {
-                    // Fallback full reload if structure changed
                     notify('Settings saved','success');
                     window.location.reload();
                 }

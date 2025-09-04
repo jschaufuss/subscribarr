@@ -85,6 +85,7 @@ class NotificationSettingsForm(forms.Form):
         label="Lookahead (days)", required=False, min_value=0, max_value=30,
         help_text="Consider items up to N days in the future for notifications if file is already available."
     )
+    youtube_enabled = forms.BooleanField(label="Enable YouTube feature", required=False)
 
 class MailSettingsForm(forms.Form):
     mail_host = forms.CharField(label="Mail Host", required=False)

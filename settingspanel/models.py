@@ -47,6 +47,9 @@ class AppSettings(models.Model):
     # Notification behavior
     notify_lookahead_days = models.PositiveSmallIntegerField(default=1, help_text="How many days ahead to consider for notifications (early availability). Set to 0 or 1 for only today.")
 
+    # Feature flags
+    youtube_enabled = models.BooleanField(default=True, help_text="Enable the YouTube subscription feature globally (navigation + routes).")
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):

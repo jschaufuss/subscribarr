@@ -9,7 +9,7 @@ class CustomUserChangeForm(UserChangeForm):
     
     class Meta:
         model = User
-        fields = ('email', 'notification_channel', 'ntfy_topic', 'apprise_url')
+        fields = ('email', 'notification_channel', 'ntfy_topic', 'apprise_url', 'hide_youtube')
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'text-input', 'placeholder': 'Email address'}),
             'ntfy_topic': forms.TextInput(attrs={'class': 'text-input', 'placeholder': 'ntfy topic (optional)'}),
