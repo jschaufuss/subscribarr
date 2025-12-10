@@ -43,7 +43,7 @@ class JellyfinClient:
 
         try:
             response = requests.post(
-                f'{self.server_url}/Users/AuthenticateByName',
+                f'{self.server_url}/Users/authenticatebyname',
                 json=auth_data,
                 headers=headers,
                 timeout=10
@@ -81,9 +81,9 @@ class JellyfinClient:
                 f'MediaBrowser Client="{self.client}", '
                 f'Device="{self.device}", '
                 f'DeviceId="{self.device_id}", '
-                f'Version="{self.version}", '
-                f'Token="{token}"'
-            )
+                f'Version="{self.version}"'
+            ),
+            'X-Emby-Token': token
         }
 
         try:
@@ -119,9 +119,9 @@ class JellyfinClient:
                 f'MediaBrowser Client="{self.client}", '
                 f'Device="{self.device}", '
                 f'DeviceId="{self.device_id}", '
-                f'Version="{self.version}", '
-                f'Token="{token}"'
-            )
+                f'Version="{self.version}"'
+            ),
+            'X-Emby-Token': token
         }
         try:
             r = requests.get(url.format(user_id='me'), headers=headers, timeout=6)
