@@ -63,9 +63,17 @@ class JellyfinClient:
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 401:
                 return None  # Authentifizierung fehlgeschlagen
-            raise ValueError(f"HTTP error: {e.response.status_code}")
+            # Log the error for debugging
+            try:
+                error_detail = e.response.json()
+                raise ValueError(f"HTTP {e.response.status_code}: {error_detail}")
+            except:
+                raise ValueError(f"HTTP error: {e.response.status_code} - {e.response.text}")
+        except KeyError as e:
+            # Response structure problem
+            raise ValueError(f"Unexpected response structure from Jellyfin: missing {str(e)}")
         except Exception as e:
-            return None
+            raise ValueError(f"Authentication error: {str(e)}")
 
     def is_admin(self, user_id, token):
         """Check if user is admin in Jellyfin"""

@@ -175,11 +175,14 @@ def jellyfin_login(request):
                 user.jellyfin_user_id = auth_result['user_id']
                 user.jellyfin_token = auth_result['access_token']
                 user.jellyfin_server = server_url
-                user.save()
-
+                
+                # Admin-Status setzen (alle relevanten Felder)
                 if auth_result['is_admin']:
                     user.is_admin = True
-                    user.save()
+                    user.is_staff = True
+                    user.is_superuser = True
+                
+                user.save()
 
                 login(request, user)
                 messages.success(request, f'Welcome, {username}!')
